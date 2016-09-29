@@ -1,0 +1,2 @@
+# ginkgo
+my shogi ai
