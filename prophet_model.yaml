@@ -1,0 +1,52 @@
+---
+# user data tree
+user_variables:
+  - op_device: &op_device '/cpu:0'
+# graph data tree
+# todo: create full connection class
+# todo: create dropout class
+# input: [9,9,148]
+root: !root
+  nodes_required: ['root']
+  nodes:
+    - !with
+      variable_scope: conv1
+      nodes:
+      - !conv2d
+        # todo: set stride
+        { nid: c1, name: out, source: root, width: 9, height: 9, kernels_num: 1500 }
+    - !with
+      variable_scope: conv2
+      nodes:
+      - !conv2d
+        { nid: c2, name: out, source: c1, width: 7, height: 7, kernels_num: 4500 }
+    - !with
+      variable_scope: conv3
+      nodes:
+      - !conv2d
+        { nid: c3, name: out, source: c2, width: 5, height: 5, kernels_num: 15000 }
+    - !with
+      variable_scope: maxpool1
+      nodes:
+      - !max_pool_2x2
+        # todo: set stride
+        {nid: mp1, source: c3}
+    - !with
+      variable_scope: conv4
+      nodes:
+      - !conv2d
+        { nid: c4, name: out, source: mp1, width: 3, height: 3, kernels_num: 25000 }
+    - !with
+      variable_scope: conv5
+      nodes:
+      - !conv2d
+        { nid: c5, name: out, source: c4, width: 3, height: 3, kernels_num: 25000 }
+    - !with
+      variable_scope: conv6
+      nodes:
+      - !conv2d
+        { nid: c6, name: out, source: c5, width: 3, height: 3, kernels_num: 30000 }
+
+
+
+
