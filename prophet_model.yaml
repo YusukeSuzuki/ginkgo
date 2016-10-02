@@ -3,50 +3,105 @@
 user_variables:
   - op_device: &op_device '/cpu:0'
 # graph data tree
-# todo: create full connection class
+# todo: create linear class
 # todo: create dropout class
+# todo: create avgpool class
 # input: [9,9,148]
 root: !root
   nodes_required: ['root']
   nodes:
     - !with
-      variable_scope: conv1
+      device_scope: '/gpu:0'
       nodes:
-      - !conv2d
-        # todo: set stride
-        { nid: c1, name: out, source: root, width: 9, height: 9, kernels_num: 1500 }
+      - !with
+        variable_scope: conv1
+        nodes:
+        - !conv2d
+          # todo: set stride
+          { nid: c1, source: root, width: 9, height: 9, kernels_num: 300, b_init: 1e-5 }
+      - !with
+        variable_scope: conv2
+        nodes:
+        - !conv2d
+          { nid: c2, source: c1, width: 7, height: 7, kernels_num: 600, b_init: 1e-5 }
+      - !with
+        variable_scope: conv3
+        nodes:
+        - !conv2d
+          { nid: c3, source: c2, width: 5, height: 5, kernels_num: 900, b_init: 1e-5 }
+      - !with
+        variable_scope: maxpool1
+        nodes:
+        - !max_pool_2x2
+          {nid: mp1, source: c3}
+      - !with
+        variable_scope: conv4
+        nodes:
+        - !conv2d
+          { nid: c4, source: mp1, width: 3, height: 3, kernels_num: 1200, b_init: 1e-5 }
+      - !with
+        variable_scope: conv5
+        nodes:
+        - !conv2d
+          { nid: c5, source: c4, width: 3, height: 3, kernels_num: 1200, b_init: 1e-5 }
+      - !with
+        variable_scope: maxpool2
+        nodes:
+        - !max_pool_2x2
+          {nid: mp2, source: c5}
+      - !with
+        variable_scope: conv6
+        nodes:
+        - !conv2d
+          { nid: c6, source: mp2, width: 3, height: 3, kernels_num: 1200, b_init: 1e-5 }
+      - !with
+        variable_scope: conv7
+        nodes:
+        - !conv2d
+          { nid: c7, source: c6, width: 3, height: 3, kernels_num: 900, b_init: 1e-5 }
+      - !with
+        variable_scope: conv8
+        nodes:
+        - !conv2d
+          { nid: c8, source: c7, width: 3, height: 3, kernels_num: 600, b_init: 1e-5 }
+      - !with
+        variable_scope: avgpool1
+        nodes:
+        - !avg_pool
+          { nid: t_ap1, value: c8, width: 3, height: 3}
+        - !dropout
+          { nid: ap1, x: t_ap1, keep_prob: 5e-1 }
+      - !with
+        variable_scope: linear1
+        nodes:
+        - !linear
+          { nid: l1, name: l1, source: ap1, b_init: 1e-5, length: 300}
+      - !with
+        variable_scope: linear2
+        nodes:
+        - !linear
+          { nid: l2, name: out, source: l1, b_init: 1e-5, length: 2}
     - !with
-      variable_scope: conv2
+      variable_scope: train
+      device_scope: '/gpu:0'
+      tags: [train]
       nodes:
-      - !conv2d
-        { nid: c2, name: out, source: c1, width: 7, height: 7, kernels_num: 4500 }
+      - !placeholder
+        { nid: label, name: label, tag: train, dtype: tf.float32, shape: [2]}
+      - !placeholder
+        { nid: turn_weight, name: turn_weight,
+          tag: train, dtype: tf.float32, shape: [1]}
+      - !prophet_loss
+          { nid: p_loss, tag: train,
+            source1: l2, source2: label, source3: turn_weight }
+      - !adam_optimizer {tag: train, name: optimizer, source: p_loss, val: 1e-4}
     - !with
-      variable_scope: conv3
+      variable_scope: log
+      device_scope: '/cpu:0'
+      tags: [train, log]
       nodes:
-      - !conv2d
-        { nid: c3, name: out, source: c2, width: 5, height: 5, kernels_num: 15000 }
-    - !with
-      variable_scope: maxpool1
-      nodes:
-      - !max_pool_2x2
-        # todo: set stride
-        {nid: mp1, source: c3}
-    - !with
-      variable_scope: conv4
-      nodes:
-      - !conv2d
-        { nid: c4, name: out, source: mp1, width: 3, height: 3, kernels_num: 25000 }
-    - !with
-      variable_scope: conv5
-      nodes:
-      - !conv2d
-        { nid: c5, name: out, source: c4, width: 3, height: 3, kernels_num: 25000 }
-    - !with
-      variable_scope: conv6
-      nodes:
-      - !conv2d
-        { nid: c6, name: out, source: c5, width: 3, height: 3, kernels_num: 30000 }
-
-
-
+      - !reduce_mean
+        {nid: loss_mean, source: p_loss, dims: [1]}
+      - !scalar_summary
+        {summary_tag: 'loss', source: loss_mean}
 

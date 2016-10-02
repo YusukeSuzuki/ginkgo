@@ -1,9 +1,7 @@
 import sys
 import shogi
 
-def convert_pos(s):
-    tbl = 'abcdefghi'
-    return s[0]+tbl[int(s[1])-1]
+tbl = 'abcdefghi'
 
 P_C2U = {
     'FU': shogi.PAWN,
@@ -24,6 +22,9 @@ P_C2U = {
 
 P_U2C = dict((v,k) for k,v in P_C2U.items())
 UCHI={'FU':'P*','KY':'L*','KE':'N*','GI':'S*','KI':'G*','KA':'B*','HI':'R*'}
+
+def convert_pos(s):
+    return s[0]+tbl[int(s[1])-1]
 
 def csa_move_to_usi(b, s):
     if s[1:3] == '00':
@@ -64,7 +65,7 @@ def convert(in_path, out_path):
         line = line.rstrip()
 
         if is_csa_movement(line):
-            total_turn = total_turn + 1
+            total_turn += 1
 
         if line[0] == '+':
             pre_player = 0
@@ -74,13 +75,11 @@ def convert(in_path, out_path):
             winner = 0 if pre_player == 1 else 1
             break
 
-    #print('winner: {}'.format(winner))
-
     in_file.seek(0)
 
     board = shogi.Board()
-    out_file = open(out_path,mode='w')
     turn = 0
+    out_lines = []
 
     for line in in_lines:
         line = line.rstrip()
@@ -88,6 +87,11 @@ def convert(in_path, out_path):
             usi = csa_move_to_usi(board, line)
             sfen = board.sfen()
             win = 'b' if winner == 0 else 'w'
-            print('{},{},{},{}'.format( sfen, total_turn, usi, win), file=out_file)
+            out_lines.append('{},{},{},{}'.format( sfen, total_turn, usi, win))
             board.push_usi(usi)
+
+    out_file = open(out_path,mode='w')
+
+    for line in out_lines:
+        print(line, file=out_file)
 

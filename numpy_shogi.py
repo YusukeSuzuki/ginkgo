@@ -29,9 +29,6 @@ PT2VM = {
 IN_HANDS_TYPE = { 1: 'R', 3: 'B', 5: 'G', 6: 'S', 8: 'N', 10:'L', 12:'P', }
 TypeHeads = [0, 4, 8, 12, 16, 20, 28, 36, 44, 52, 60, 68, 76, 112,]
 
-def sfen_to_vector(sfen):
-    return board_to_vector(sh.Board(sfen))
-
 def skipped_board(board):
     sfen = board.sfen()
     splitted = sfen.split(' ')
@@ -41,7 +38,10 @@ def skipped_board(board):
 def sqr2rc(square):
     return (square // 9, square % 9)
 
-def board_to_vector(board):
+def sfen_to_vector(sfen, debug=False):
+    return board_to_vector(sh.Board(sfen), debug)
+
+def board_to_vector(board, debug=False):
     sides = [ [[] for i in range(len(PT2VM))], [[] for i in range(len(PT2VM))] ]
     hands = [ [0] * len(PT2VM), [0] * len(PT2VM) ]
 
@@ -59,7 +59,11 @@ def board_to_vector(board):
 
     moves = [board.legal_moves, skipped_board(board).legal_moves]
 
-    vec = np.zeros([148,9,9])
+    if not debug:
+        vec = np.zeros([1,9,9,148])
+    else:
+        vec = np.zeros([148,9,9])
+
     p_counts = [0] * len(PT2VM)
 
     side_value = [1,-1]
@@ -69,7 +73,11 @@ def board_to_vector(board):
             ''' pieces on board '''
             ''' placement '''
             vec_i = TypeHeads[i] + p_counts[i] * 2
-            vec[vec_i][piece[0]][piece[1]] = side_value[side]
+            
+            if not debug:
+                vec[0][piece[0]][piece[1]][vec_i] = side_value[side]
+            else:
+                vec[vec_i][piece[0]][piece[1]] = side_value[side]
 
             ''' movement '''
             vec_i = vec_i + 1
@@ -82,7 +90,12 @@ def board_to_vector(board):
                 if move.from_square == pos_sqr:
                     to_pos = sqr2rc(move.to_square)
                     temp_vec_i =  vec_ip if move.promotion else vec_i
-                    vec[temp_vec_i][to_pos[0]][to_pos[1]] = side_value[side]
+
+                    if not debug:
+                        vec[0][to_pos[0]][to_pos[1]][temp_vec_i] = side_value[side]
+                    else:
+                        vec[temp_vec_i][to_pos[0]][to_pos[1]] = side_value[side]
+
                     prom_found = prom_found or move.promotion
 
             p_counts[i] = p_counts[i] + 1
@@ -96,7 +109,12 @@ def board_to_vector(board):
                 if str(move)[0] != IN_HANDS_TYPE[i]: continue
 
                 to_pos = sqr2rc(move.to_square)
-                vec[vec_i][to_pos[0]][to_pos[1]] = side_value[side]
+
+                if not debug:
+                    vec[0][to_pos[0]][to_pos[1]][vec_i] = side_value[side]
+                else:
+                    vec[vec_i][to_pos[0]][to_pos[1]] = side_value[side]
+
             p_counts[i] = p_counts[i] + 1
 
     return vec
@@ -107,9 +125,6 @@ def vector_to_usi_movement():
 if __name__ == '__main__':
     np.set_printoptions(threshold=np.inf)
     board = sh.Board()
-    #print( list(board.legal_moves) )
     vec = sfen_to_vector(board.sfen())
     print(vec)
-    #print( board.sfen() )
-    #print( skipped_board(board).sfen() )
 

@@ -1,11 +1,12 @@
 import yaml
 import tensorflow as tf
+import pydoc
 
 # ------------------------------------------------------------
 # utilities
 # ------------------------------------------------------------
 
-def weight_variable(shape, dev=0.35, name=None):
+def weight_variable(shape, dev=0.035, name=None):
     """create weight variable for conv2d(weight sharing)"""
 
     return tf.get_variable(name, shape,
@@ -21,6 +22,11 @@ class WithNone:
     def __enter__(self): pass
     def __exit__(self,t,v,tb): pass
 
+StrDTypeMap = {
+    'tf.float32': tf.float32,
+    'tensorflow.float32': tf.float32,
+    }
+
 # ------------------------------------------------------------
 # assert
 # ------------------------------------------------------------
@@ -30,6 +36,12 @@ def nop(val):
 
 def is_exist(key, val):
     return (val, '{} required'.format(key))
+
+def is_type_string(key, val):
+    return (pydoc.locate(val) is not None, '{} must be name of type'.format(key))
+
+def is_dtype_string(key, val):
+    return (val in StrDTypeMap, '{} must be name of tf.DType'.format(key))
 
 def not_empty(key, val):
     return (len(val) > 0, '{} must not be empty'.format(key))
@@ -136,6 +148,8 @@ class Root(yaml.YAMLObject):
         for node in self.nodes:
             self.__nids = node.build(self.__nids, exclude_tags)
 
+        return self.__nids
+
 class With(yaml.YAMLObject, Node):
     yaml_tag = u'!with'
 
@@ -170,6 +184,67 @@ class With(yaml.YAMLObject, Node):
                 nids = node.build(nids, exclude_tags)
 
         return nids, None, None
+
+class Placeholder(yaml.YAMLObject, Node):
+    yaml_tag = u'!placeholder'
+
+    def __init__(self, loader, node):
+        params = {
+            'nid': (str, None, []),
+            'tags': (nop, [], [is_typeof(list)]),
+            'dtype': (str, None, [is_exist, is_dtype_string]),
+            'shape': (nop, None, [is_exist, is_typeof(list)]),
+            'name': (str, None, []),
+            'variable_scope': (str, None, [])
+            }
+        self.parse(loader, node, params)
+
+    def __repr__(self):
+        return 'Placeholder'
+
+    @classmethod
+    def from_yaml(cls, loader, node):
+        return cls(loader, node)
+
+    def create_node(self, nids, exclude_tags):
+        with tf.variable_scope(self.variable_scope) if self.variable_scope else WithNone():
+            ph = tf.placeholder(StrDTypeMap[self.dtype], self.shape, name=self.name)
+            return nids, self.nid, ph
+
+class Linear(yaml.YAMLObject, Node):
+    yaml_tag = u'!linear'
+
+    def __init__(self, loader, node):
+        params = {
+            'nid': (str, None, []),
+            'tags': (nop, [], [is_typeof(list)]),
+            'source': (nop, None, [is_exist]),
+            'length': (int, 0, [is_greater_than(0)]),
+            'b_init': (float, 0.1, []),
+            'name': (str, None, []),
+            'variable_scope': (str, None, [])
+            }
+        self.parse(loader, node, params)
+
+    def __repr__(self):
+        return 'Linear'
+
+    @classmethod
+    def from_yaml(cls, loader, node):
+        return cls(loader, node)
+
+    def create_node(self, nids, exclude_tags):
+        source_node = nids[self.source]
+        source_node = tf.reshape(source_node, [1,-1])
+        source_length = source_node.get_shape()[1]
+
+        with tf.variable_scope(self.variable_scope) if self.variable_scope else WithNone():
+            w = weight_variable(
+                [source_length,self.length], name="weight")
+            b = bias_variable([self.length], val=self.b_init, name="bias")
+            mul = tf.matmul(source_node, w)
+
+        return nids, self.nid, mul + b
 
 class Conv2d(yaml.YAMLObject, Node):
     yaml_tag = u'!conv2d'
@@ -355,6 +430,60 @@ class MaxPool2x2(yaml.YAMLObject, Node):
         return nids, self.nid, tf.nn.max_pool(
             source_node, ksize=self.ksize, strides=self.strides,
             padding=self.padding, name=self.name)
+
+class AvgPool(yaml.YAMLObject, Node):
+    yaml_tag = u'!avg_pool'
+
+    def __init__(self, loader, node):
+        params = {
+            'nid': (str, None, []),
+            'tags': (nop, [], [is_typeof(list)]),
+            'value': (nop, None, [is_exist]),
+            'ksize': (nop, [1,2,2,1], [is_typeof(list)]),
+            'strides': (nop, [1,2,2,1], [is_typeof(list)]),
+            'padding': (str, 'SAME', []),
+            'name': (str, None, []),
+            }
+        self.parse(loader, node, params)
+
+    def __repr__(self):
+        return 'AvgPool'
+
+    @classmethod
+    def from_yaml(cls, loader, node):
+        return cls(loader, node)
+
+    def create_node(self, nids, exclude_tags):
+        value_node = nids[self.value]
+
+        return nids, self.nid, tf.nn.avg_pool(
+            value_node, ksize=self.ksize, strides=self.strides,
+            padding=self.padding, name=self.name)
+
+class DropOut(yaml.YAMLObject, Node):
+    yaml_tag = u'!dropout'
+
+    def __init__(self, loader, node):
+        params = {
+            'nid': (str, None, []),
+            'tags': (nop, [], [is_typeof(list)]),
+            'x': (nop, None, [is_exist]),
+            'keep_prob': (float, 0.4, []),
+            'name': (str, None, []),
+            }
+        self.parse(loader, node, params)
+
+    def __repr__(self):
+        return 'AvgPool'
+
+    @classmethod
+    def from_yaml(cls, loader, node):
+        return cls(loader, node)
+
+    def create_node(self, nids, exclude_tags):
+        value_node = nids[self.x]
+
+        return nids, self.nid, tf.nn.dropout(value_node, self.keep_prob)
 
 class ReduceMean(yaml.YAMLObject, Node):
     yaml_tag = u'!reduce_mean'
