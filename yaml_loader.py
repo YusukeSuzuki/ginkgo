@@ -460,6 +460,30 @@ class AvgPool(yaml.YAMLObject, Node):
             value_node, ksize=self.ksize, strides=self.strides,
             padding=self.padding, name=self.name)
 
+class ReLU(yaml.YAMLObject, Node):
+    yaml_tag = u'!relu'
+
+    def __init__(self, loader, node):
+        params = {
+            'nid': (str, None, []),
+            'tags': (nop, [], [is_typeof(list)]),
+            'features': (nop, None, [is_exist]),
+            'name': (str, None, []),
+            }
+        self.parse(loader, node, params)
+
+    def __repr__(self):
+        return 'ReLU'
+
+    @classmethod
+    def from_yaml(cls, loader, node):
+        return cls(loader, node)
+
+    def create_node(self, nids, exclude_tags):
+        value_node = nids[self.features]
+
+        return nids, self.nid, tf.nn.relu(value_node, self.keep_prob)
+
 class DropOut(yaml.YAMLObject, Node):
     yaml_tag = u'!dropout'
 
@@ -474,7 +498,7 @@ class DropOut(yaml.YAMLObject, Node):
         self.parse(loader, node, params)
 
     def __repr__(self):
-        return 'AvgPool'
+        return 'Dropout'
 
     @classmethod
     def from_yaml(cls, loader, node):
