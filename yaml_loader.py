@@ -6,11 +6,12 @@ import pydoc
 # utilities
 # ------------------------------------------------------------
 
-def weight_variable(shape, dev=0.035, name=None):
+def weight_variable(shape, dev=0.35, name=None):
     """create weight variable for conv2d(weight sharing)"""
 
     return tf.get_variable(name, shape,
-        initializer=tf.truncated_normal_initializer(stddev=dev))
+        #initializer=tf.truncated_normal_initializer(stddev=dev))
+        initializer=tf.random_uniform_initializer(minval=-0.1, maxval=0.1))
 
 def bias_variable(shape, val=0.1, name=None):
     """create bias variable for conv2d(weight sharing)"""
@@ -240,7 +241,7 @@ class Linear(yaml.YAMLObject, Node):
 
         with tf.variable_scope(self.variable_scope) if self.variable_scope else WithNone():
             w = weight_variable(
-                [source_length,self.length], name="weight")
+                [source_length,self.length], dev=1.0e-3, name="weight")
             b = bias_variable([self.length], val=self.b_init, name="bias")
             mul = tf.matmul(source_node, w)
 
@@ -278,11 +279,12 @@ class Conv2d(yaml.YAMLObject, Node):
 
         with tf.variable_scope(self.variable_scope) if self.variable_scope else WithNone():
             w = weight_variable(
-                [self.height, self.width, channels,self.kernels_num], name="weight")
+                [self.height, self.width, channels,self.kernels_num], dev=1.0e-3, name="weight")
             b = bias_variable([self.kernels_num], val=self.b_init, name="bias")
-
-        return nids, self.nid, tf.add( tf.nn.conv2d(
+            out = tf.add( tf.nn.conv2d(
                 source_node, w, strides=self.strides, padding=self.padding), b, name=self.name)
+
+        return nids, self.nid, out
 
 class Conv2dTranspose(yaml.YAMLObject, Node):
     yaml_tag = u'!conv2d_transpose'
@@ -370,18 +372,13 @@ class Conv2dAELoss(yaml.YAMLObject, Node):
 class AdamOptimizer(yaml.YAMLObject, Node):
     yaml_tag = u'!adam_optimizer'
 
-    def __init__(self, nid, source, val=1e-4, name=None):
-        self.nid = nid
-        self.name = name
-        self.source = source
-        self.val = val
-
     def __init__(self, loader, node):
         params = {
             'nid': (str, None, []),
             'tags': (nop, [], [is_typeof(list)]),
             'source': (nop, None, [is_exist]),
             'val': (float, 1e-4, []),
+            'takelog': (bool, False, []),
             'name': (str, None, []),
             }
         self.parse(loader, node, params)
@@ -399,8 +396,21 @@ class AdamOptimizer(yaml.YAMLObject, Node):
         global_step = tf.get_variable(
             'global_step', (),
             initializer=tf.constant_initializer(0), trainable=False)
-        return nids, self.nid, tf.train.AdamOptimizer(self.val).minimize(
-            source_node, global_step=global_step, name=self.name)
+
+        if self.takelog:
+            opt = tf.train.AdamOptimizer(self.val)
+            grads = opt.compute_gradients(source_node)
+
+            with tf.device('/cpu:0'):
+                for grad, var in grads:
+                    if grad is not None:
+                        tf.histogram_summary('grads/'+var.name, grad)
+            apply_gradient_op = opt.apply_gradients(grads, global_step=global_step, name=self.name)
+
+            return nids, self.nid, apply_gradient_op
+        else:
+            return nids, self.nid, tf.train.AdamOptimizer(self.val).minimize(
+                source_node, global_step=global_step, name=self.name)
 
 class MaxPool2x2(yaml.YAMLObject, Node):
     yaml_tag = u'!max_pool_2x2'
@@ -482,7 +492,55 @@ class ReLU(yaml.YAMLObject, Node):
     def create_node(self, nids, exclude_tags):
         value_node = nids[self.features]
 
-        return nids, self.nid, tf.nn.relu(value_node, self.keep_prob)
+        return nids, self.nid, tf.nn.relu(value_node, name=self.name)
+
+class Tanh(yaml.YAMLObject, Node):
+    yaml_tag = u'!tanh'
+
+    def __init__(self, loader, node):
+        params = {
+            'nid': (str, None, []),
+            'tags': (nop, [], [is_typeof(list)]),
+            'x': (nop, None, [is_exist]),
+            'name': (str, None, []),
+            }
+        self.parse(loader, node, params)
+
+    def __repr__(self):
+        return 'Tanh'
+
+    @classmethod
+    def from_yaml(cls, loader, node):
+        return cls(loader, node)
+
+    def create_node(self, nids, exclude_tags):
+        value_node = nids[self.x]
+
+        return nids, self.nid, tf.tanh(value_node, name=self.name)
+
+class Softmax(yaml.YAMLObject, Node):
+    yaml_tag = u'!softmax'
+
+    def __init__(self, loader, node):
+        params = {
+            'nid': (str, None, []),
+            'tags': (nop, [], [is_typeof(list)]),
+            'logit': (nop, None, [is_exist]),
+            'name': (str, None, []),
+            }
+        self.parse(loader, node, params)
+
+    def __repr__(self):
+        return 'Softmax'
+
+    @classmethod
+    def from_yaml(cls, loader, node):
+        return cls(loader, node)
+
+    def create_node(self, nids, exclude_tags):
+        value_node = nids[self.logit]
+
+        return nids, self.nid, tf.nn.softmax(value_node, name=self.name)
 
 class DropOut(yaml.YAMLObject, Node):
     yaml_tag = u'!dropout'

@@ -48,10 +48,10 @@ def do_train(namespace):
     merged = tf.merge_all_summaries()
 
     # rate log
-    with tf.variable_scope('log'), tf.device('/cpu:0'):
-        correct_rate = tf.placeholder(tf.float32, [])
-        correct_summary = tf.scalar_summary(
-            'correct_answer_rate', correct_rate)
+#    with tf.variable_scope('log'), tf.device('/cpu:0'):
+#        correct_rate = tf.placeholder(tf.float32, [])
+#        correct_summary = tf.scalar_summary(
+#            'correct_answer_rate', correct_rate)
 
     # ready to run
 
@@ -82,31 +82,41 @@ def do_train(namespace):
         while True:
             record = choice(records)
             sfen, side, turn, total, move, winner = shogi_records.to_data(record)
-            if side == 'b': break
+            if side != 'b':
+                continue
+            if int(turn) < 16:
+                continue
+
+            break
+
         board = shogi.Board(sfen)
         board.push_usi(move)
         board_vec = numpy_shogi.board_to_vector(board)
         
         match_vec = np.array([
-            1.0e+8 if side == winner else 0.0,
-            1.0e+8 if side != winner else 0.0])
+            1.0 if side == winner else 0.0,
+            1.0 if side != winner else 0.0])
 
-        print('loop: {}'.format(i))
-        summary, res, out = sess.run( (merged, train, tags['l2']),
-            feed_dict={ input_vector: board_vec, tags['label']: match_vec,
-                tags['turn_weight']: [math.sqrt(float(turn)/float(total))]} )
+        if (i + 1) % 10 == 0:
+            summary, out, res = sess.run( (merged, tags['out'], train),
+                feed_dict={ input_vector: board_vec, tags['label']: match_vec,
+                    tags['turn_weight']: [math.sqrt(float(turn)/float(total))]} )
+            writer.add_summary(summary, i)
+        else:
+            out, res = sess.run( (tags['out'], train),
+                feed_dict={ input_vector: board_vec, tags['label']: match_vec,
+                    tags['turn_weight']: [math.sqrt(float(turn)/float(total))]} )
 
         ret_winner = 'b' if out[0][0] > out[0][1] else 'w'
         score.append(1 if ret_winner == winner else 0)
 
-        rate_summary = sess.run( (correct_summary),
-            feed_dict={correct_rate: sum(score) / len(score)})
+        print('loop: {}, {}, {}, {}, {}'.format(i, out,
+            '<' if out[0][0] > out[0][1] else '>',
+            '<' if match_vec[0] < match_vec[1] else '>',
+            sum(score) / len(score)))
 
-        if len(score) == 1000:
+        if len(score) == 200:
             score.pop(0)
-
-        writer.add_summary(summary, i)
-        writer.add_summary(rate_summary, i)
 
         if i > 10 and i % 4000 == 1:
             print('save backup to: {}'.format(model_backup_path))
