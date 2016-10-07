@@ -81,6 +81,9 @@ def convert(in_path, out_path):
     turn = 0
     out_lines = []
 
+    if winner is None:
+        return
+
     for line in in_lines:
         line = line.rstrip()
         if is_csa_movement(line):
