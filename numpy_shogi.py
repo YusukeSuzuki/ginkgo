@@ -26,6 +26,15 @@ PT2VM = {
     sh.PROM_PAWN: 13,
     }
 
+PROMS = {
+    sh.ROOK: sh.PROM_ROOK,
+    sh.BISHOP: sh.PROM_BISHOP,
+    sh.SILVER: sh.PROM_SILVER,
+    sh.KNIGHT: sh.PROM_KNIGHT,
+    sh.LANCE: sh.PROM_LANCE,
+    sh.PAWN: sh.PROM_PAWN,
+    }
+
 IN_HANDS_TYPE = { 1: 'R', 3: 'B', 5: 'G', 6: 'S', 8: 'N', 10:'L', 12:'P', }
 TypeHeads = [0, 4, 8, 12, 16, 20, 28, 36, 44, 52, 60, 68, 76, 112,]
 
@@ -37,9 +46,6 @@ def skipped_board(board):
 
 def sqr2rc(square):
     return (square // 9, square % 9)
-
-def sfen_to_vector(sfen, debug=False):
-    return board_to_vector(sh.Board(sfen), debug)
 
 def board_to_vector(board, debug=False):
     sides = [ [[] for i in range(len(PT2VM))], [[] for i in range(len(PT2VM))] ]
@@ -116,6 +122,76 @@ def board_to_vector(board, debug=False):
                     vec[vec_i][to_pos[0]][to_pos[1]] = side_value[side]
 
             p_counts[i] = p_counts[i] + 1
+
+    return vec
+
+def skipped_sfen(sfen):
+    splitted = sfen.split(' ')
+    splitted[1] = 'w' if splitted[1] == 'b' else 'b'
+    return ' '.join(splitted)
+
+def sfen_to_vector(sfen, debug=False):
+    boards = [ sh.Board(sfen), sh.Board(skipped_sfen(sfen)), ]
+    sides = {0:1, 1:-1}
+
+    # make moves and drops
+    moves = [ [[] for i in range(81)], [[] for i in range(81)] ]
+    drops = [ [] * len(PT2VM), [] * len(PT2VM) ]
+
+    for side, val in sides.items():
+        for move in boards[side].legal_moves:
+            if move.from_square is not None:
+                moves[side][move.from_square].append( move )
+            else:
+                drops[side][PT2VM[drop_piece_type]].append( move )
+
+    # make pieces
+    pieces = [[],[]]
+
+    for sqr in range(81):
+        p = boards[0].piece_at(sqr)
+
+        if p is None: continue
+
+        pieces[p.color].append( (sqr, PT2VM[p.piece_type], moves[p.color][sqr]) )
+
+    for side, val in sides.items():
+        for p in boards[side].pieces_in_hand[0]:
+            pieces[side].append(
+                (None, PT2VM[p.piece_type], drops[side][PT2VM[p.piece_type]]) )
+
+    vec = np.zeros([1,9,9,148]) if not debug else np.zeros([148,9,9])
+    p_cnt = [0] * len(PT2VM)
+
+    for side, val in sides.items():
+        for p in pieces[side]:
+            pos_type = p[1]
+            pro_type = PROMS.get(p[1],None)
+
+            ch = TypeHeads[p[1]] + p_cnt[p[1]] * 2
+
+            if p[0] is not None:
+                to = sqr2rc(p[0])
+                if not debug:
+                    vec[0][to[0]][to[1]][ch] = val
+                else:
+                    vec[ch][to[0]][to[1]] = val
+                pos_type = p[1]
+
+            ch = ch + 1
+            if pro_type is not None:
+                ch_pro = TypeHeads[pro_type] + p_cnt[pro_type] * 2
+
+            for m in p[2]:
+                to = sqr2rc(m.to_square)
+                tmp_ch = ch if not m.promotion else ch_pro
+                if not debug:
+                    vec[0][to[0]][to[1]][tmp_ch] = val
+                else:
+                    vec[tmp_ch][to[0]][to[1]] = val
+
+            if pos_type is not None: p_cnt[pos_type] += 1
+            if pro_type is not None: p_cnt[pro_type] += 1
 
     return vec
 
