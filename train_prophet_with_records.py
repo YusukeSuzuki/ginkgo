@@ -93,29 +93,19 @@ def do_train(namespace):
         new_records.append( (sfen, side, turn, total, move, winner) )
 
     records = new_records
-    vecs = []
     
-    print('create vecs')
-
-    for r in records:
+    def record_to_vec(r):
         sfen, side, turn, total, move, winner = r
 
-        board = shogi.Board(sfen)
-        board.push_usi(move)
-        board_vec = numpy_shogi.board_to_vector(board)
+        board_vec = numpy_shogi.sfen_to_vector(sfen, usi=move)
         
         match_vec = np.array([
             1.0 if side == winner else 0.0,
             1.0 if side != winner else 0.0])
 
-        vecs.append( (np.squeeze(board_vec, axis=0), match_vec, [math.sqrt(float(turn)/float(total))]) )
-        
-        if len(vecs) % 10 == 0:
-            print(len(vecs))
+        return (np.squeeze(board_vec, axis=0), match_vec, [math.sqrt(float(turn)/float(total))])
 
-
-    vecs_iter = iter(vecs)
-
+    records_iter = iter(records)
 
     def create_batch():
         board_list = []
@@ -124,7 +114,7 @@ def do_train(namespace):
         print('choice start')
 
         for i in range(MINI_BATCH_SIZE):
-            b,m,w = vecs_iter.__next__()
+            b,m,w = record_to_vec(records_iter.__next__())
 
             board_list.append(b)
             match_list.append(m)
@@ -139,7 +129,7 @@ def do_train(namespace):
 
     print('train')
 
-    for i in range(0, 300000):
+    for i in range(0, 50000):
         board_batch, match_batch, weight_batch = create_batch()
 
         if (i + 1) % 10 == 0:

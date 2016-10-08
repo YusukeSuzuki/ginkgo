@@ -27,12 +27,12 @@ PT2VM = {
     }
 
 PROMS = {
-    sh.ROOK: sh.PROM_ROOK,
-    sh.BISHOP: sh.PROM_BISHOP,
-    sh.SILVER: sh.PROM_SILVER,
-    sh.KNIGHT: sh.PROM_KNIGHT,
-    sh.LANCE: sh.PROM_LANCE,
-    sh.PAWN: sh.PROM_PAWN,
+    PT2VM[sh.ROOK]: PT2VM[sh.PROM_ROOK],
+    PT2VM[sh.BISHOP]: PT2VM[sh.PROM_BISHOP],
+    PT2VM[sh.SILVER]: PT2VM[sh.PROM_SILVER],
+    PT2VM[sh.KNIGHT]: PT2VM[sh.PROM_KNIGHT],
+    PT2VM[sh.LANCE]: PT2VM[sh.PROM_LANCE],
+    PT2VM[sh.PAWN]: PT2VM[sh.PROM_PAWN],
     }
 
 IN_HANDS_TYPE = { 1: 'R', 3: 'B', 5: 'G', 6: 'S', 8: 'N', 10:'L', 12:'P', }
@@ -130,20 +130,25 @@ def skipped_sfen(sfen):
     splitted[1] = 'w' if splitted[1] == 'b' else 'b'
     return ' '.join(splitted)
 
-def sfen_to_vector(sfen, debug=False):
-    boards = [ sh.Board(sfen), sh.Board(skipped_sfen(sfen)), ]
+def sfen_to_vector(sfen, usi=None, debug=False):
+    initial_board = sh.Board(sfen)
+
+    if usi is not None:
+        initial_board.push_usi(usi)
+
+    boards = [ initial_board, sh.Board(skipped_sfen(sfen)), ]
     sides = {0:1, 1:-1}
 
     # make moves and drops
     moves = [ [[] for i in range(81)], [[] for i in range(81)] ]
-    drops = [ [] * len(PT2VM), [] * len(PT2VM) ]
+    drops = [ [[]] * len(PT2VM), [[]] * len(PT2VM) ]
 
     for side, val in sides.items():
         for move in boards[side].legal_moves:
             if move.from_square is not None:
                 moves[side][move.from_square].append( move )
             else:
-                drops[side][PT2VM[drop_piece_type]].append( move )
+                drops[side][PT2VM[move.drop_piece_type]].append( move )
 
     # make pieces
     pieces = [[],[]]
@@ -156,9 +161,9 @@ def sfen_to_vector(sfen, debug=False):
         pieces[p.color].append( (sqr, PT2VM[p.piece_type], moves[p.color][sqr]) )
 
     for side, val in sides.items():
-        for p in boards[side].pieces_in_hand[0]:
-            pieces[side].append(
-                (None, PT2VM[p.piece_type], drops[side][PT2VM[p.piece_type]]) )
+        for key, p in boards[0].pieces_in_hand[side].most_common():
+            for i in range(p):
+                pieces[side].append( (None, PT2VM[key], drops[side][PT2VM[key]]) )
 
     vec = np.zeros([1,9,9,148]) if not debug else np.zeros([148,9,9])
     p_cnt = [0] * len(PT2VM)
@@ -166,7 +171,7 @@ def sfen_to_vector(sfen, debug=False):
     for side, val in sides.items():
         for p in pieces[side]:
             pos_type = p[1]
-            pro_type = PROMS.get(p[1],None)
+            pro_type = PROMS.get(p[1])
 
             ch = TypeHeads[p[1]] + p_cnt[p[1]] * 2
 
@@ -180,6 +185,7 @@ def sfen_to_vector(sfen, debug=False):
 
             ch = ch + 1
             if pro_type is not None:
+                #print('pro_type = {}'.format(pro_type))
                 ch_pro = TypeHeads[pro_type] + p_cnt[pro_type] * 2
 
             for m in p[2]:
