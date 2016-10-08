@@ -105,10 +105,10 @@ root: !root
       tags: [train]
       nodes:
       - !placeholder
-        { nid: label, name: label, tag: train, dtype: tf.float32, shape: [2]}
+        { nid: label, name: label, tag: train, dtype: tf.float32, shape: [null,2]}
       - !placeholder
         { nid: turn_weight, name: turn_weight,
-          tag: train, dtype: tf.float32, shape: [1]}
+          tag: train, dtype: tf.float32, shape: [null,1]}
       - !prophet_loss
           { nid: p_loss, tag: train,
             source1: out, source2: label, source3: turn_weight }
