@@ -1,6 +1,7 @@
 import yaml
 import tensorflow as tf
 import pydoc
+import math
 
 # ------------------------------------------------------------
 # utilities
@@ -13,11 +14,20 @@ def weight_variable(shape, dev=0.35, name=None):
         #initializer=tf.truncated_normal_initializer(stddev=dev))
         initializer=tf.random_uniform_initializer(minval=-0.1, maxval=0.1))
 
+def conv_weight_variable(shape, dev=0.35, name=None):
+    """create weight variable for conv2d(weight sharing)"""
+    w = 1e-2
+
+    return tf.get_variable(name, shape,
+        initializer=tf.random_uniform_initializer(minval=0, maxval=w))
+
 def bias_variable(shape, val=0.1, name=None):
     """create bias variable for conv2d(weight sharing)"""
 
-    return tf.get_variable(
-        name, shape, initializer=tf.constant_initializer(val))
+#    return tf.get_variable(
+#        name, shape, initializer=tf.constant_initializer(val))
+    return tf.get_variable(name, shape,
+        initializer=tf.random_uniform_initializer(minval=-val, maxval=val))
 
 class WithNone:
     def __enter__(self): pass
@@ -236,7 +246,8 @@ class Linear(yaml.YAMLObject, Node):
 
     def create_node(self, nids, exclude_tags):
         source_node = nids[self.source]
-        source_node = tf.reshape(source_node, [1,-1])
+        batch_size = source_node.get_shape().as_list()[0]
+        source_node = tf.reshape(source_node, [batch_size,-1])
         source_length = source_node.get_shape()[1]
 
         with tf.variable_scope(self.variable_scope) if self.variable_scope else WithNone():
@@ -244,8 +255,18 @@ class Linear(yaml.YAMLObject, Node):
                 [source_length,self.length], dev=1.0e-3, name="weight")
             b = bias_variable([self.length], val=self.b_init, name="bias")
             mul = tf.matmul(source_node, w)
+            with tf.device('/cpu:0'):
+                tf.histogram_summary('linear/mul/'+self.nid, mul)
 
-        return nids, self.nid, mul + b
+        return nids, self.nid, mul
+#            w = weight_variable(
+#                [source_length,self.length], dev=1.0e-3, name="weight")
+#            b = bias_variable([self.length], val=self.b_init, name="bias")
+#            mul = tf.matmul(source_node, w)
+#            with tf.device('/cpu:0'):
+#                tf.histogram_summary('linear/mul/'+self.nid, mul)
+#
+#        return nids, self.nid, mul + b
 
 class Conv2d(yaml.YAMLObject, Node):
     yaml_tag = u'!conv2d'
@@ -275,16 +296,22 @@ class Conv2d(yaml.YAMLObject, Node):
 
     def create_node(self, nids, exclude_tags):
         source_node = nids[self.source]
-        channels = source_node.get_shape()[3]
+        channels = source_node.get_shape().as_list()[3]
 
         with tf.variable_scope(self.variable_scope) if self.variable_scope else WithNone():
-            w = weight_variable(
+            w = conv_weight_variable(
                 [self.height, self.width, channels,self.kernels_num], dev=1.0e-3, name="weight")
-            b = bias_variable([self.kernels_num], val=self.b_init, name="bias")
-            out = tf.add( tf.nn.conv2d(
-                source_node, w, strides=self.strides, padding=self.padding), b, name=self.name)
+            out = tf.nn.conv2d(
+                source_node, w, strides=self.strides, padding=self.padding, name=self.name)
 
         return nids, self.nid, out
+#            w = conv_weight_variable(
+#                [self.height, self.width, channels,self.kernels_num], dev=1.0e-3, name="weight")
+#            b = bias_variable([self.kernels_num], val=self.b_init, name="bias")
+#            out = tf.add( tf.nn.conv2d(
+#                source_node, w, strides=self.strides, padding=self.padding), b, name=self.name)
+#
+#        return nids, self.nid, out
 
 class Conv2dTranspose(yaml.YAMLObject, Node):
     yaml_tag = u'!conv2d_transpose'
@@ -518,6 +545,58 @@ class Tanh(yaml.YAMLObject, Node):
 
         return nids, self.nid, tf.tanh(value_node, name=self.name)
 
+class Sigmoid(yaml.YAMLObject, Node):
+    yaml_tag = u'!sigmoid'
+
+    def __init__(self, loader, node):
+        params = {
+            'nid': (str, None, []),
+            'tags': (nop, [], [is_typeof(list)]),
+            'x': (nop, None, [is_exist]),
+            'name': (str, None, []),
+            }
+        self.parse(loader, node, params)
+
+    def __repr__(self):
+        return 'Sigmoid'
+
+    @classmethod
+    def from_yaml(cls, loader, node):
+        return cls(loader, node)
+
+    def create_node(self, nids, exclude_tags):
+        value_node = nids[self.x]
+
+        return nids, self.nid, tf.sigmoid(value_node, name=self.name)
+
+class BatchNormalization(yaml.YAMLObject, Node):
+    yaml_tag = u'!batch_normalization'
+
+    def __init__(self, loader, node):
+        params = {
+            'nid': (str, None, []),
+            'tags': (nop, [], [is_typeof(list)]),
+            'x': (nop, None, [is_exist]),
+            'name': (str, None, []),
+            'variable_scope': (str, None, [])
+            }
+        self.parse(loader, node, params)
+
+    def __repr__(self):
+        return 'BatchNormalization'
+
+    @classmethod
+    def from_yaml(cls, loader, node):
+        return cls(loader, node)
+
+    def create_node(self, nids, exclude_tags):
+        x = nids[self.x]
+
+        with tf.variable_scope(self.variable_scope) if self.variable_scope else WithNone():
+            mean, var = tf.nn.moments(x, [0])
+
+        return nids, self.nid, tf.nn.batch_normalization( x, mean, var, None, None, 1e-9)
+
 class Softmax(yaml.YAMLObject, Node):
     yaml_tag = u'!softmax'
 
@@ -654,6 +733,31 @@ class ImageSummary(yaml.YAMLObject, Node):
 
         return nids, self.nid, tf.image_summary(
             self.summary_tag, source_node, max_images=self.max_images, name=self.name)
+
+class HistogramSummary(yaml.YAMLObject, Node):
+    yaml_tag = u'!histogram_summary'
+
+    def __init__(self, loader, node):
+        params = {
+            'nid': (str, None, []),
+            'tags': (nop, [], [is_typeof(list)]),
+            'source': (nop, None, [is_exist]),
+            'summary_tag': (str, '', [not_empty]),
+            'name': (str, None, []),
+            }
+        self.parse(loader, node, params)
+
+    def __repr__(self):
+        return 'HistogramSummary'
+
+    @classmethod
+    def from_yaml(cls, loader, node):
+        return cls(loader, node)
+
+    def create_node(self, nids, exclude_tags):
+        source_node = nids[self.source]
+
+        return nids, self.nid, tf.histogram_summary(self.summary_tag, source_node)
 
 # ------------------------------------------------------------
 # Loader function

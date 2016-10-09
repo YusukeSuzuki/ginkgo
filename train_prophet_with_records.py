@@ -111,7 +111,6 @@ def do_train(namespace):
         board_list = []
         match_list = []
         weight_list = []
-        print('choice start')
 
         for i in range(MINI_BATCH_SIZE):
             b,m,w = record_to_vec(records_iter.__next__())
@@ -124,7 +123,6 @@ def do_train(namespace):
         match_batch = np.stack( tuple(match_list) )
         weight_batch = np.stack( tuple(weight_list) )
 
-        print('choice end')
         return board_batch, match_batch, weight_batch
 
     print('train')

@@ -3,10 +3,7 @@
 user_variables:
   - op_device: &op_device '/cpu:0'
 # graph data tree
-# todo: create linear class
-# todo: create dropout class
-# todo: create avgpool class
-# input: [9,9,148]
+# input: [-1,9,9,148]
 root: !root
   nodes_required: ['root']
   nodes:
@@ -17,82 +14,72 @@ root: !root
         variable_scope: conv1
         nodes:
         - !conv2d
-          { nid: t_c1, source: root, width: 9, height: 9, kernels_num: 600, b_init: 1e-7 }
-        #- !relu { nid: c1, features: t_c1 }
-        - !tanh { nid: c1, x: t_c1 }
+          { nid: c1_o, source: root, width: 9, height: 9, kernels_num: 600, b_init: 1e-7 }
+        - !batch_normalization { nid: c1_n, x: c1_o }
+        - !relu { nid: c1, features: c1_n }
       - !with
         variable_scope: conv2
         nodes:
         - !conv2d
-          { nid: t_c2, source: c1, width: 7, height: 7, kernels_num: 900, b_init: 1e-7 }
-        #- !relu { nid: c2, features: t_c2 }
-        - !tanh { nid: c2, x: t_c2 }
+          { nid: c2_o, source: c1, width: 7, height: 7, kernels_num: 900, b_init: 1e-7 }
+        - !batch_normalization { nid: c2_n, x: c2_o }
+        - !relu { nid: c2, features: c2_n }
       - !with
         variable_scope: conv3
         nodes:
         - !conv2d
-          { nid: t_c3, source: c2, width: 5, height: 5, kernels_num: 1200, b_init: 1e-7 }
-        #- !relu { nid: c3, features: t_c3 }
-        - !tanh { nid: c3, x: t_c3 }
-      - !with
-        variable_scope: maxpool1
-        nodes:
-        - !max_pool_2x2
-          {nid: mp1, source: c3}
+          { nid: c3_o, source: c2, width: 5, height: 5, kernels_num: 1200, b_init: 1e-7 }
+        - !batch_normalization { nid: c3_n, x: c3_o }
+        - !relu { nid: c3, features: c3_n }
       - !with
         variable_scope: conv4
         nodes:
         - !conv2d
-          { nid: t_c4, source: mp1, width: 3, height: 3, kernels_num: 1600, b_init: 1e-7 }
-        #- !relu { nid: c4, features: t_c4 }
-        - !tanh { nid: c4, x: t_c4 }
+          { nid: c4_o, source: c3, width: 3, height: 3, kernels_num: 1600, b_init: 1e-7 }
+        - !batch_normalization { nid: c4_n, x: c4_o }
+        - !relu { nid: c4, features: c4_n }
       - !with
         variable_scope: conv5
         nodes:
         - !conv2d
-          { nid: t_c5, source: c4, width: 3, height: 3, kernels_num: 1600, b_init: 1e-7 }
-        #- !relu { nid: c5, features: t_c5 }
-        - !tanh { nid: c5, x: t_c5 }
+          { nid: c5_o, source: c4, width: 3, height: 3, kernels_num: 1600, b_init: 1e-7 }
+        - !batch_normalization { nid: c5_n, x: c5_o }
+        - !relu { nid: c5, features: c5_n }
       - !with
         variable_scope: maxpool2
         nodes:
         - !max_pool_2x2
-          {nid: mp2, source: c5}
+          {nid: mp2, source: c5 , ksize: [1,3,3,1], strides: [1,3,3,1]}
       - !with
         variable_scope: conv6
         nodes:
         - !conv2d
-          { nid: t_c6, source: mp2, width: 3, height: 3, kernels_num: 1600, b_init: 1e-7 }
-        #- !relu { nid: c6, features: t_c6 }
-        - !tanh { nid: c6, x: t_c6 }
+          { nid: c6_o, source: mp2, width: 3, height: 3, kernels_num: 1600, b_init: 1e-7 }
+        - !batch_normalization { nid: c6_n, x: c6_o }
+        - !relu { nid: c6, features: c6_n }
       - !with
         variable_scope: conv7
         nodes:
         - !conv2d
-          { nid: t_c7, source: c6, width: 3, height: 3, kernels_num: 1200, b_init: 1e-7 }
-        #- !relu { nid: c7, features: t_c7 }
-        - !tanh { nid: c7, x: t_c7 }
+          { nid: c7_o, source: c6, width: 3, height: 3, kernels_num: 1200, b_init: 1e-7 }
+        - !batch_normalization { nid: c7_n, x: c7_o }
+        - !relu { nid: c7, features: c7_n }
       - !with
         variable_scope: conv8
         nodes:
         - !conv2d
-          { nid: t_c8, source: c7, width: 3, height: 3, kernels_num: 900, b_init: 1e-7 }
-        #- !relu { nid: c8, features: t_c8 }
-        - !tanh { nid: c8, x: t_c8 }
-      - !with
-        variable_scope: avgpool1
-        nodes:
-        - !avg_pool
-          { nid: ap1, value: c8, width: 3, height: 3}
+          { nid: c8_o, source: c7, width: 3, height: 3, kernels_num: 900, b_init: 1e-7 }
+        - !batch_normalization { nid: c8_n, x: c8_o }
+        - !relu { nid: c8, features: c8_n }
       - !with
         variable_scope: linear1
         nodes:
         - !linear
-          { nid: t_l1, name: l1, source: ap1, b_init: 1e-15, length: 600}
-        - !tanh
-          { nid: tt_l1, name: tanh1, x: t_l1}
+          { nid: l1_o, name: l1, source: c8, b_init: 1e-15, length: 600}
+        - !batch_normalization { nid: l1_n, x: l1_o }
+        - !relu { nid: l1_f, features: l1_n }
         - !dropout
-          { nid: l1, x: tt_l1, keep_prob: 0.25 }
+          { nid: l1, x: l1_f, keep_prob: 0.5 }
       - !with
         variable_scope: linear2
         nodes:
@@ -112,7 +99,7 @@ root: !root
       - !prophet_loss
           { nid: p_loss, tag: train,
             source1: out, source2: label, source3: turn_weight }
-      - !adam_optimizer {tag: train, name: optimizer, source: p_loss, val: 1e-4, takelog: true}
+      - !adam_optimizer {tag: train, name: optimizer, source: p_loss, val: 1e-3, takelog: true}
     - !with
       variable_scope: log
       device_scope: '/cpu:0'
@@ -122,4 +109,22 @@ root: !root
         {nid: loss_mean, source: p_loss, dims: [1]}
       - !scalar_summary
         {summary_tag: 'loss', source: loss_mean}
+      - !histogram_summary
+        {summary_tag: 'out/c1', source: c1}
+      - !histogram_summary
+        {summary_tag: 'out/c2', source: c2}
+      - !histogram_summary
+        {summary_tag: 'out/c3', source: c3}
+      - !histogram_summary
+        {summary_tag: 'out/c4', source: c4}
+      - !histogram_summary
+        {summary_tag: 'out/c5', source: c5}
+      - !histogram_summary
+        {summary_tag: 'out/c6', source: c6}
+      - !histogram_summary
+        {summary_tag: 'out/c7', source: c7}
+      - !histogram_summary
+        {summary_tag: 'out/c8', source: c8}
+      - !histogram_summary
+        {summary_tag: 'out/l1_f', source: l1_f}
 
