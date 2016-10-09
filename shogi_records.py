@@ -1,5 +1,14 @@
 from pathlib import Path
 
+def load_file(path):
+    f = Path(path)
+
+    lines = f.open().readlines()
+    lines = list(map(lambda x: x.rstrip(), lines))
+    lines = filter(lambda x: len(x) > 0, lines)
+
+    return lines
+
 def load_files(path):
     d = Path(path)
 

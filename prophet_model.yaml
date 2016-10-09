@@ -91,11 +91,11 @@ root: !root
       device_scope: '/gpu:0'
       tags: [train]
       nodes:
-      - !placeholder
-        { nid: label, name: label, tag: train, dtype: tf.float32, shape: [null,2]}
-      - !placeholder
-        { nid: turn_weight, name: turn_weight,
-          tag: train, dtype: tf.float32, shape: [null,1]}
+#      - !placeholder
+#        { nid: label, name: label, tag: train, dtype: tf.float32, shape: [null,2]}
+#      - !placeholder
+#        { nid: turn_weight, name: turn_weight,
+#          tag: train, dtype: tf.float32, shape: [null,1]}
       - !prophet_loss
           { nid: p_loss, tag: train,
             source1: out, source2: label, source3: turn_weight }
