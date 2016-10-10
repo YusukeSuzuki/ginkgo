@@ -20,7 +20,7 @@ ROOT_VARIABLE_SCOPE='prophet'
 MODEL_YAML_PATH = 'prophet_model.yaml'
 MODELS_DIR = 'models'
 
-MINI_BATCH_SIZE = 50
+MINI_BATCH_SIZE = 100
 
 # ------------------------------------------------------------
 # sub commands
@@ -78,12 +78,12 @@ def do_train(namespace):
 
     for t in load_threads: t.start()
 
-    for i in range(0, 10000):
-        if (i + 1) % 10 == 0:
-            summary, out, res = sess.run( (merged, tags['out'], train), feed_dict={} )
+    for i in range(0, 40000):
+        if i % 5 == 0:
+            summary, res = sess.run( (merged, train), feed_dict={} )
             writer.add_summary(summary, i)
         else:
-            out, res = sess.run( (tags['out'], train), feed_dict={} )
+            res = sess.run( (train), feed_dict={} )
 
         print('loop: {}'.format(i))
 

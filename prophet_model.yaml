@@ -100,6 +100,7 @@ root: !root
           { nid: p_loss, tag: train,
             source1: out, source2: label, source3: turn_weight }
       - !adam_optimizer {tag: train, name: optimizer, source: p_loss, val: 1e-4, takelog: false}
+      - !correct_rate {tag: train, nid: rate, x1: label, x2: out}
     - !with
       variable_scope: log
       device_scope: '/cpu:0'
