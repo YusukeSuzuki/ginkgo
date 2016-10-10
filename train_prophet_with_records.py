@@ -20,7 +20,7 @@ ROOT_VARIABLE_SCOPE='prophet'
 MODEL_YAML_PATH = 'prophet_model.yaml'
 MODELS_DIR = 'models'
 
-MINI_BATCH_SIZE = 20
+MINI_BATCH_SIZE = 50
 
 # ------------------------------------------------------------
 # sub commands
@@ -39,14 +39,10 @@ def do_train(namespace):
     path_list = list(Path('data/sfen').glob('*.csa'))
 
     with tf.variable_scope('input'), tf.device('/cpu:0'):
-        input_vector = tf.placeholder(tf.float32, [9,9,148])
-        label_vector = tf.placeholder(tf.float32, [2])
-        weight_vector = tf.placeholder(tf.float32, [1])
-
         load_threads, input_batch, label_batch, weight_batch = \
             shogi_loader.load_sfenx_threads_and_queue(
                 coordinator, sess, path_list, MINI_BATCH_SIZE,
-                input_vector, label_vector, weight_vector, threads_num=8)
+                threads_num=8)
 
     # build model
     with tf.variable_scope(ROOT_VARIABLE_SCOPE):
@@ -61,12 +57,6 @@ def do_train(namespace):
     # create saver and logger
     saver = tf.train.Saver()
     merged = tf.merge_all_summaries()
-
-    # rate log
-#    with tf.variable_scope('log'), tf.device('/cpu:0'):
-#        correct_rate = tf.placeholder(tf.float32, [])
-#        correct_summary = tf.scalar_summary(
-#            'correct_answer_rate', correct_rate)
 
     # ready to run
 

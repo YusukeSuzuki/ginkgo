@@ -99,7 +99,7 @@ root: !root
       - !prophet_loss
           { nid: p_loss, tag: train,
             source1: out, source2: label, source3: turn_weight }
-      - !adam_optimizer {tag: train, name: optimizer, source: p_loss, val: 1e-3, takelog: true}
+      - !adam_optimizer {tag: train, name: optimizer, source: p_loss, val: 1e-4, takelog: false}
     - !with
       variable_scope: log
       device_scope: '/cpu:0'
@@ -109,22 +109,22 @@ root: !root
         {nid: loss_mean, source: p_loss, dims: [1]}
       - !scalar_summary
         {summary_tag: 'loss', source: loss_mean}
-      - !histogram_summary
-        {summary_tag: 'out/c1', source: c1}
-      - !histogram_summary
-        {summary_tag: 'out/c2', source: c2}
-      - !histogram_summary
-        {summary_tag: 'out/c3', source: c3}
-      - !histogram_summary
-        {summary_tag: 'out/c4', source: c4}
-      - !histogram_summary
-        {summary_tag: 'out/c5', source: c5}
-      - !histogram_summary
-        {summary_tag: 'out/c6', source: c6}
-      - !histogram_summary
-        {summary_tag: 'out/c7', source: c7}
-      - !histogram_summary
-        {summary_tag: 'out/c8', source: c8}
-      - !histogram_summary
-        {summary_tag: 'out/l1_f', source: l1_f}
+#      - !histogram_summary
+#        {summary_tag: 'out/c1', source: c1}
+#      - !histogram_summary
+#        {summary_tag: 'out/c2', source: c2}
+#      - !histogram_summary
+#        {summary_tag: 'out/c3', source: c3}
+#      - !histogram_summary
+#        {summary_tag: 'out/c4', source: c4}
+#      - !histogram_summary
+#        {summary_tag: 'out/c5', source: c5}
+#      - !histogram_summary
+#        {summary_tag: 'out/c6', source: c6}
+#      - !histogram_summary
+#        {summary_tag: 'out/c7', source: c7}
+#      - !histogram_summary
+#        {summary_tag: 'out/c8', source: c8}
+#      - !histogram_summary
+#        {summary_tag: 'out/l1_f', source: l1_f}
 

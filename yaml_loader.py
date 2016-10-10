@@ -255,16 +255,12 @@ class Linear(yaml.YAMLObject, Node):
                 [source_length,self.length], dev=1.0e-3, name="weight")
             b = bias_variable([self.length], val=self.b_init, name="bias")
             mul = tf.matmul(source_node, w)
-            with tf.device('/cpu:0'):
-                tf.histogram_summary('linear/mul/'+self.nid, mul)
 
         return nids, self.nid, mul
 #            w = weight_variable(
 #                [source_length,self.length], dev=1.0e-3, name="weight")
 #            b = bias_variable([self.length], val=self.b_init, name="bias")
 #            mul = tf.matmul(source_node, w)
-#            with tf.device('/cpu:0'):
-#                tf.histogram_summary('linear/mul/'+self.nid, mul)
 #
 #        return nids, self.nid, mul + b
 
