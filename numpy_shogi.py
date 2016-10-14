@@ -204,9 +204,20 @@ def sfen_to_vector(sfen, usi=None, debug=False):
 def vector_to_usi_movement():
     pass
 
+def fliplr(vec):
+    res = np.zeros(vec.shape)
+
+    for r in range(9):
+        for c in range(9):
+            res[0][r][8-c] = vec[0][r][c]
+
+    return res
+
 if __name__ == '__main__':
     np.set_printoptions(threshold=np.inf)
     board = sh.Board()
     vec = sfen_to_vector(board.sfen())
+    vec = fliplr(vec)
+    vec = np.transpose(vec, [0,3,1,2])
     print(vec)
 
