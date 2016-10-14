@@ -87,3 +87,23 @@ training plan(prophet/enforcer)
     − [float32: 自身が勝つ割合, float32: 相手が勝つ割合]
     - 論理的に等価なものを2次元ベクトルにしているのはラベリングタスクの流儀である
 
+必要なプログラム
+================================================================================
+
+- prophet model
+  - train from records
+      - model performance test
+- enforcer model
+  - train from random data(candedates)
+      - model performance test
+  - train from records(candedates)
+      - model performance test
+  - train from records(determin)
+      - model performance test
+- autonomous training
+  - with prophet model
+  - without prophet model
+- autonomous playing
+- floodgate client
+- usi backend
+
