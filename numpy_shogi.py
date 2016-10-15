@@ -128,13 +128,17 @@ def sfen_to_vector(sfen, usi=None, debug=False):
 def to_debug(vec):
     return np.transpose(vec, [0,3,1,2])
 
-def fliplr(vec):
-    perm = [8,7,6,5,4,3,2,1,0]
-    i = np.argsort(vec.diagonal() * -1)
-    return vec[:,i]
-
 def vector_to_usi_movement():
     pass
+
+def fliplr(vec):
+    res = np.zeros(vec.shape)
+
+    for r in range(9):
+        for c in range(9):
+            res[0][r][8-c] = vec[0][r][c]
+
+    return res
 
 if __name__ == '__main__':
     np.set_printoptions(threshold=np.inf)
