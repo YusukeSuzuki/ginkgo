@@ -140,14 +140,42 @@ def fliplr(vec):
 
     return res
 
+def player_inverse(vec):
+    res = np.zeros(vec.shape)
+
+    for r in range(9):
+        for c in range(9):
+            res[0][r][c][  0:180] = vec[0][r][c][180:360]
+            res[0][r][c][180:360] = vec[0][r][c][  0:180]
+
+    res2 = np.zeros(vec.shape)
+
+    for r in range(9):
+        for c in range(9):
+            res2[0][8-r][8-c] = res[0][r][c]
+
+    return res2
+
+from random import choice
+
 if __name__ == '__main__':
     np.set_printoptions(threshold=np.inf)
     board = sh.Board()
     #vec = sfen_to_vector(board.sfen(), debug=True)
-    vec = sfen_to_vector(board.sfen())
-    #vec = fliplr(vec)
-    #vec = np.rot90(vec)
-    #vec[:,[0,1]] = vec[:,[1,0]]
-    vec = to_debug(fliplr(vec))
-    print(vec)
+
+    if False:
+        vec = sfen_to_vector(board.sfen())
+        vec = fliplr(vec)
+        vec = to_debug(vec)
+        print(vec)
+
+    if True:
+        for i in range(20):
+            board.push(choice(list(board.legal_moves)))
+
+        vec = sfen_to_vector(board.sfen())
+        vec = player_inverse(vec)
+        vec = to_debug(vec)
+        print(board)
+        print(vec)
 

@@ -13,6 +13,9 @@ def record_to_vec(r):
     sfen, side, turn, total, move, winner = r
 
     board_vec = numpy_shogi.sfen_to_vector(sfen, usi=move)
+
+    if side == 'w':
+        board_vec = numpy_shogi.player_inverse(board_vec)
     
     match_vec = np.array([
         1.0 if side == winner else 0.0,
@@ -24,10 +27,12 @@ def record_to_vec(r):
 
 def map_func(r):
     sfen, side, turn, total, move, winner = r = sr.to_data(r)
-    if side != 'b': return None
     if int(turn) < 30: return None
 
+    #if side != 'b': return None
+
     board_vec, label_vec, weight_vec = record_to_vec(r)
+
     return (
         np.expand_dims(board_vec,0),
         np.expand_dims(label_vec,0),

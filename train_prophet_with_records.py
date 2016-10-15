@@ -91,6 +91,13 @@ def do_train(namespace):
             print('save backup to: {}'.format(model_backup_path))
             saver.save(sess, str(model_backup_path))
 
+        if i < 100 and i % 10:
+            writer.flush()
+        if i < 2000 and i % 100:
+            writer.flush()
+        if i < 5000 and i % 200:
+            writer.flush()
+
     print('save to: {}'.format(model_path))
     saver.save(sess, str(model_path))
 
