@@ -33,6 +33,9 @@ def map_func(r):
         np.expand_dims(label_vec,0),
         np.expand_dims(weight_vec,0))
 
+def flipdata(r):
+    return (numpy_shogi.fliplr(r[0]), r[1], r[2])
+
 def load_loop(coord, sess, enqueue_op, path_q, pool,
         input_vector_ph, label_ph, turn_weight_ph):
 
@@ -46,6 +49,9 @@ def load_loop(coord, sess, enqueue_op, path_q, pool,
             #sfen, side, turn, total, move, winner = r = sr.to_data(r)
             data_list = list(pool.map(map_func, records))
             data_list = list(filter(lambda x: x is not None, data_list))
+
+            data_list2 = list(pool.map(flipdata, data_list))
+            data_list.extend(data_list2)
 
             vecs = [list(t) for t in zip(*data_list)]
             vecs = list(map(np.concatenate, vecs))

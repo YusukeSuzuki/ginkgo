@@ -148,6 +148,6 @@ if __name__ == '__main__':
     #vec = fliplr(vec)
     #vec = np.rot90(vec)
     #vec[:,[0,1]] = vec[:,[1,0]]
-    vec = to_debug(vec)
+    vec = to_debug(fliplr(vec))
     print(vec)
 
