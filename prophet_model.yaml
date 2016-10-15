@@ -3,7 +3,7 @@
 user_variables:
   - op_device: &op_device '/cpu:0'
 # graph data tree
-# input: [-1,9,9,148]
+# input: [-1,9,9,360]
 root: !root
   nodes_required: ['root']
   nodes:

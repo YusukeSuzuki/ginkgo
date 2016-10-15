@@ -70,12 +70,12 @@ def load_loop(coord, sess, enqueue_op, path_q, pool,
 def load_sfenx_threads_and_queue(
         coord, sess, path_list, batch_size, threads_num=1):
 
-    input_vector_ph = tf.placeholder(tf.float32, [None,9,9,148])
+    input_vector_ph = tf.placeholder(tf.float32, [None,9,9,360])
     label_ph = tf.placeholder(tf.float32, [None,2])
     turn_weight_ph = tf.placeholder(tf.float32, [None,1])
 
     q = tf.RandomShuffleQueue(50000, 8000,
-        [tf.float32, tf.float32, tf.float32], [[9,9,148], [2], [1]])
+        [tf.float32, tf.float32, tf.float32], [[9,9,360], [2], [1]])
     enqueue_op = q.enqueue_many(
         [input_vector_ph, label_ph, turn_weight_ph])
     path_q = Queue()

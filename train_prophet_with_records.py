@@ -78,7 +78,7 @@ def do_train(namespace):
 
     for t in load_threads: t.start()
 
-    for i in range(0, 40000):
+    for i in range(0, 100000):
         if i % 5 == 0:
             summary, res = sess.run( (merged, train), feed_dict={} )
             writer.add_summary(summary, i)
@@ -108,7 +108,7 @@ def do_eval(namespace):
 def do_dump_network(namespace):
     # build
     with tf.variable_scope('input'), tf.device('/cpu:0'):
-        input_vector = tf.placeholder(tf.float32, [1,9,9,148])
+        input_vector = tf.placeholder(tf.float32, [1,9,9,360])
 
     with tf.variable_scope(ROOT_VARIABLE_SCOPE):
         graph_root = yl.load(MODEL_YAML_PATH)
@@ -129,7 +129,7 @@ def do_dump_graph_log(namespace):
     #print('exclude tags: {}'.format(namespace.exclude_tags.split(',')))
 
     with tf.variable_scope('input'), tf.device('/cpu:0'):
-        input_vector = tf.placeholder(tf.float32, [1,9,9,148])
+        input_vector = tf.placeholder(tf.float32, [1,9,9,360])
 
     with tf.variable_scope(ROOT_VARIABLE_SCOPE):
         graph_root = yl.load(MODEL_YAML_PATH)

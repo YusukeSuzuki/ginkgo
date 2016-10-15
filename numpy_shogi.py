@@ -3,7 +3,10 @@ import numpy as np
 
 # 'a-Z' is position dimention
 # '_' is movement dimention
-# k_k_r_r_R_R_b_b_B_B_g_g_g_g_s_s_s_s_S_S_S_S_n_n_n_n_N_N_N_N_l_l_l_l_L_L_L_L_p_p_p_p_p_p_p_p_p_p_p_p_p_p_p_p_p_p_P_P_P_P_P_P_P_P_P_P_P_P_P_P_P_P_P_P_
+# promotable piece has two movement dimentions
+# k_r_r_R_R_b_b_B_B_g_g_g_g_s_s_s_s_S_S_S_S_n_n_n_n_N_N_N_N_l_l_l_l_L_L_L_L_p_p_p_p_p_p_p_p_p_p_p_p_p_p_p_p_p_p_P_P_P_P_P_P_P_P_P_P_P_P_P_P_P_P_P_P_
+# k_r_r_R_R_b_b_B_B_g_g_g_g_s_s_s_s_S_S_S_S_n_n_n_n_N_N_N_N_l_l_l_l_L_L_L_L_p_p_p_p_p_p_p_p_p_p_p_p_p_p_p_p_p_p_P_P_P_P_P_P_P_P_P_P_P_P_P_P_P_P_P_P_
+# 9*9*180*2
 
 '''
 PieceType2VectorMap
@@ -36,7 +39,10 @@ PROMS = {
     }
 
 IN_HANDS_TYPE = { 1: 'R', 3: 'B', 5: 'G', 6: 'S', 8: 'N', 10:'L', 12:'P', }
-TypeHeads = [0, 4, 8, 12, 16, 20, 28, 36, 44, 52, 60, 68, 76, 112,]
+
+#            k  r  R   b   B   g   s   S   n   N   l   L   p    P
+TypeHeads = [0, 2, 8, 12, 18, 22, 30, 42, 50, 62, 70, 82, 90, 144,] # 180
+TypeSkips = [2, 3, 2,  3,  2,  2,  3,  2,  3,  2,  3,  2,  3,   2,] # 180
 
 def skipped_board(board):
     sfen = board.sfen()
@@ -46,84 +52,6 @@ def skipped_board(board):
 
 def sqr2rc(square):
     return (square // 9, square % 9)
-
-def board_to_vector(board, debug=False):
-    sides = [ [[] for i in range(len(PT2VM))], [[] for i in range(len(PT2VM))] ]
-    hands = [ [0] * len(PT2VM), [0] * len(PT2VM) ]
-
-    for r in range(0,9):
-        for c in range(0,9):
-            p = board.piece_at(r * 9 + c)
-            if p is None: continue
-
-            side = 0 if p.color == 0 else 1
-            sides[side][PT2VM[p.piece_type]] = sides[side][PT2VM[p.piece_type]] + [(r,c)]
-
-    for i in range(len(board.pieces_in_hand)):
-        for key, value in board.pieces_in_hand[i].items():
-            hands[i][PT2VM[key]] = value
-
-    moves = [board.legal_moves, skipped_board(board).legal_moves]
-
-    if not debug:
-        vec = np.zeros([1,9,9,148])
-    else:
-        vec = np.zeros([148,9,9])
-
-    p_counts = [0] * len(PT2VM)
-
-    side_value = [1,-1]
-
-    for i, side in [(i, side) for i in range(len(PT2VM)) for side in range(len(sides))]:
-        for piece in sides[side][i]:
-            ''' pieces on board '''
-            ''' placement '''
-            vec_i = TypeHeads[i] + p_counts[i] * 2
-            
-            if not debug:
-                vec[0][piece[0]][piece[1]][vec_i] = side_value[side]
-            else:
-                vec[vec_i][piece[0]][piece[1]] = side_value[side]
-
-            ''' movement '''
-            vec_i = vec_i + 1
-            vec_ip = 0 if i+1 == len(PT2VM) else TypeHeads[i+1] + p_counts[i+1] * 2 + 1
-            pos_sqr = piece[0] * 9 + piece[1]
-
-            prom_found = False
-
-            for move in moves[side]:
-                if move.from_square == pos_sqr:
-                    to_pos = sqr2rc(move.to_square)
-                    temp_vec_i =  vec_ip if move.promotion else vec_i
-
-                    if not debug:
-                        vec[0][to_pos[0]][to_pos[1]][temp_vec_i] = side_value[side]
-                    else:
-                        vec[temp_vec_i][to_pos[0]][to_pos[1]] = side_value[side]
-
-                    prom_found = prom_found or move.promotion
-
-            p_counts[i] = p_counts[i] + 1
-            if prom_found:
-                p_counts[i+1] = p_counts[i+1] + 1
-
-        for j in range(hands[side][i]):
-            ''' pieces in hand '''
-            vec_i = TypeHeads[i] + p_counts[i] * 2 + 1
-            for move in moves[side]:
-                if str(move)[0] != IN_HANDS_TYPE[i]: continue
-
-                to_pos = sqr2rc(move.to_square)
-
-                if not debug:
-                    vec[0][to_pos[0]][to_pos[1]][vec_i] = side_value[side]
-                else:
-                    vec[vec_i][to_pos[0]][to_pos[1]] = side_value[side]
-
-            p_counts[i] = p_counts[i] + 1
-
-    return vec
 
 def skipped_sfen(sfen):
     splitted = sfen.split(' ')
@@ -137,13 +65,13 @@ def sfen_to_vector(sfen, usi=None, debug=False):
         initial_board.push_usi(usi)
 
     boards = [ initial_board, sh.Board(skipped_sfen(sfen)), ]
-    sides = {0:1, 1:-1}
+    sides = [0,1]
 
     # make moves and drops
     moves = [ [[] for i in range(81)], [[] for i in range(81)] ]
     drops = [ [[]] * len(PT2VM), [[]] * len(PT2VM) ]
 
-    for side, val in sides.items():
+    for side in sides:
         for move in boards[side].legal_moves:
             if move.from_square is not None:
                 moves[side][move.from_square].append( move )
@@ -160,46 +88,50 @@ def sfen_to_vector(sfen, usi=None, debug=False):
 
         pieces[p.color].append( (sqr, PT2VM[p.piece_type], moves[p.color][sqr]) )
 
-    for side, val in sides.items():
+    for side in sides:
         for key, p in boards[0].pieces_in_hand[side].most_common():
             for i in range(p):
                 pieces[side].append( (None, PT2VM[key], drops[side][PT2VM[key]]) )
 
-    vec = np.zeros([1,9,9,148]) if not debug else np.zeros([148,9,9])
-    p_cnt = [0] * len(PT2VM)
+    vec = np.zeros([1,9,9,360])
 
-    for side, val in sides.items():
+    p_cnt = [[0] * len(PT2VM), [0] * len(PT2VM)]
+    ch_base = [0,180]
+
+    for side in sides:
         for p in pieces[side]:
             pos_type = p[1]
-            pro_type = PROMS.get(p[1])
 
-            ch = TypeHeads[p[1]] + p_cnt[p[1]] * 2
+            # position channel
+            chB = ch_base[side] +  TypeHeads[p[1]] + p_cnt[side][p[1]] * TypeSkips[p[1]]
+            # movement channel
+            chM = ch_base[side] +  TypeHeads[p[1]] + p_cnt[side][p[1]] * TypeSkips[p[1]] + 1
+            # movement with promotion channel
+            chP = ch_base[side] +  TypeHeads[p[1]] + p_cnt[side][p[1]] * TypeSkips[p[1]] + 2
 
             if p[0] is not None:
                 to = sqr2rc(p[0])
-                if not debug:
-                    vec[0][to[0]][to[1]][ch] = val
-                else:
-                    vec[ch][to[0]][to[1]] = val
-                pos_type = p[1]
-
-            ch = ch + 1
-            if pro_type is not None:
-                #print('pro_type = {}'.format(pro_type))
-                ch_pro = TypeHeads[pro_type] + p_cnt[pro_type] * 2
+                vec[0][to[0]][to[1]][chB] = 1
 
             for m in p[2]:
                 to = sqr2rc(m.to_square)
-                tmp_ch = ch if not m.promotion else ch_pro
-                if not debug:
-                    vec[0][to[0]][to[1]][tmp_ch] = val
-                else:
-                    vec[tmp_ch][to[0]][to[1]] = val
+                tmp_ch = chM if not m.promotion else chP
+                vec[0][to[0]][to[1]][tmp_ch] = 1
 
-            if pos_type is not None: p_cnt[pos_type] += 1
-            if pro_type is not None: p_cnt[pro_type] += 1
+            if pos_type is not None: p_cnt[side][pos_type] += 1
+
+    if debug:
+        vec = np.transpose(vec, [0,3,1,2])
 
     return vec
+
+def to_debug(vec):
+    return np.transpose(vec, [0,3,1,2])
+
+def fliplr(vec):
+    perm = [8,7,6,5,4,3,2,1,0]
+    i = np.argsort(vec.diagonal() * -1)
+    return vec[:,i]
 
 def vector_to_usi_movement():
     pass
@@ -207,6 +139,11 @@ def vector_to_usi_movement():
 if __name__ == '__main__':
     np.set_printoptions(threshold=np.inf)
     board = sh.Board()
+    #vec = sfen_to_vector(board.sfen(), debug=True)
     vec = sfen_to_vector(board.sfen())
+    #vec = fliplr(vec)
+    #vec = np.rot90(vec)
+    #vec[:,[0,1]] = vec[:,[1,0]]
+    vec = to_debug(vec)
     print(vec)
 
