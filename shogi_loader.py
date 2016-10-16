@@ -5,6 +5,7 @@ import tensorflow as tf
 import numpy as np
 
 from threading import Thread
+import queue
 from queue import Queue
 import math
 from concurrent.futures import ProcessPoolExecutor as Executor
@@ -41,13 +42,12 @@ def map_func(r):
 def flipdata(r):
     return (numpy_shogi.fliplr(r[0]), r[1], r[2])
 
-def load_loop(coord, sess, enqueue_op, path_q, pool,
+def load_loop(coord, sess, enqueue_op, close_op,  path_q, pool, loop,
         input_vector_ph, label_ph, turn_weight_ph):
-
 
     while not coord.should_stop():
         try:
-            path = path_q.get()
+            path = path_q.get(timeout=10)
 
             records = sr.load_file(path)
 
@@ -70,16 +70,22 @@ def load_loop(coord, sess, enqueue_op, path_q, pool,
                 label_ph: vecs[1],
                 turn_weight_ph: vecs[2]})
 
-            path_q.put(path)
+            if loop:
+                path_q.put(path)
+
+        except queue.Empty  as e:
+            try:
+                sess.run(close_op)
+            except tf.errors.CancelledError:
+                pass
+            break
         except tf.errors.AbortedError as e:
-            print(e)
             break
         except tf.errors.CancelledError as e:
-            print(e)
             break
 
 def load_sfenx_threads_and_queue(
-        coord, sess, path_list, batch_size, threads_num=1):
+        coord, sess, path_list, batch_size, loop=False, threads_num=1):
 
     input_vector_ph = tf.placeholder(tf.float32, [None,9,9,360])
     label_ph = tf.placeholder(tf.float32, [None,2])
@@ -89,6 +95,7 @@ def load_sfenx_threads_and_queue(
         [tf.float32, tf.float32, tf.float32], [[9,9,360], [2], [1]])
     enqueue_op = q.enqueue_many(
         [input_vector_ph, label_ph, turn_weight_ph])
+    close_op = q.close()
     path_q = Queue()
 
     for p in path_list:
@@ -97,7 +104,7 @@ def load_sfenx_threads_and_queue(
     pool = Executor(max_workers=threads_num+2)
 
     threads = [Thread(target=load_loop,
-        args=(coord, sess, enqueue_op, path_q, pool,
+        args=(coord, sess, enqueue_op, close_op, path_q, pool, loop,
             input_vector_ph, label_ph, turn_weight_ph))
         for i in range(threads_num)]
 

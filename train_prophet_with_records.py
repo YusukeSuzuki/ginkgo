@@ -37,6 +37,7 @@ def do_train(namespace):
 
     # build read data threads
     path_list = list(Path('data/train').glob('*.csa'))
+    #path_list = list(Path('data/exper').glob('*.csa'))
 
     with tf.variable_scope('input'), tf.device('/cpu:0'):
         load_threads, input_batch, label_batch, weight_batch = \
@@ -78,25 +79,32 @@ def do_train(namespace):
 
     for t in load_threads: t.start()
 
-    for i in range(0, 100000):
-        if i % 5 == 0:
-            summary, res = sess.run( (merged, train), feed_dict={} )
-            writer.add_summary(summary, i)
-        else:
-            res = sess.run( (train), feed_dict={} )
+    global_step = sess.run(tags['global_step'])
 
-        print('loop: {}'.format(i))
+    try:
+        while not coordinator.should_stop():
+            if global_step % 5 == 0:
+                summary, res, global_step = sess.run( (merged, train, tags['global_step']), feed_dict={} )
+                writer.add_summary(summary, global_step)
+            else:
+                res, global_step = sess.run( (train, tags['global_step']), feed_dict={} )
 
-        if i > 10 and i % 4000 == 1:
-            print('save backup to: {}'.format(model_backup_path))
-            saver.save(sess, str(model_backup_path))
+            global_step = int(global_step)
 
-        if i < 100 and i % 10:
-            writer.flush()
-        if i < 2000 and i % 100:
-            writer.flush()
-        if i < 5000 and i % 200:
-            writer.flush()
+            print('loop: {}'.format(global_step))
+
+            if global_step > 10 and global_step % 4000 == 1:
+                print('save backup to: {}'.format(model_backup_path))
+                saver.save(sess, str(model_backup_path))
+
+            if global_step < 100 and global_step % 10:
+                writer.flush()
+            if global_step < 2000 and global_step % 100:
+                writer.flush()
+            if global_step < 5000 and global_step % 200:
+                writer.flush()
+    except tf.errors.OutOfRangeError as e:
+        print('sample exausted')
 
     print('save to: {}'.format(model_path))
     saver.save(sess, str(model_path))
@@ -180,11 +188,14 @@ def do_eval(namespace):
 def do_dump_network(namespace):
     # build
     with tf.variable_scope('input'), tf.device('/cpu:0'):
-        input_vector = tf.placeholder(tf.float32, [1,9,9,360])
+        input_vector = tf.placeholder(tf.float32, [MINI_BATCH_SIZE,9,9,360])
+        label_vector = tf.placeholder(tf.float32, [MINI_BATCH_SIZE,2])
+        weight_vector = tf.placeholder(tf.float32, [MINI_BATCH_SIZE,1])
 
     with tf.variable_scope(ROOT_VARIABLE_SCOPE):
         graph_root = yl.load(MODEL_YAML_PATH)
-        tags = graph_root.build(feed_dict={'root': input_vector})
+        tags = graph_root.build(feed_dict={
+            'root': input_vector, 'label': label_vector, 'turn_weight': weight_vector})
 
     print('-- variables')
     for variable in tf.all_variables():
