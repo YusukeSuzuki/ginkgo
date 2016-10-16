@@ -36,7 +36,7 @@ def do_train(namespace):
     coordinator = tf.train.Coordinator()
 
     # build read data threads
-    path_list = list(Path('data/sfen').glob('*.csa'))
+    path_list = list(Path('data/train').glob('*.csa'))
 
     with tf.variable_scope('input'), tf.device('/cpu:0'):
         load_threads, input_batch, label_batch, weight_batch = \
@@ -107,7 +107,72 @@ def do_train(namespace):
     writer.close()
 
 def do_test(namespace):
-    print('unavailable now')
+    models_dir = Path(MODELS_DIR)
+    models_dir.mkdir(parents=True, exist_ok=True)
+    model_path = models_dir/namespace.modelfile
+    model_backup_path = models_dir/(namespace.modelfile+'.back')
+
+    sess = tf.Session()
+    coordinator = tf.train.Coordinator()
+
+    # build read data threads
+    path_list = list(Path('data/test').glob('*.csa'))
+
+    with tf.variable_scope('input'), tf.device('/cpu:0'):
+        load_threads, input_batch, label_batch, weight_batch = \
+            shogi_loader.load_sfenx_threads_and_queue(
+                coordinator, sess, path_list, MINI_BATCH_SIZE,
+                threads_num=8)
+
+    # build model
+    with tf.variable_scope(ROOT_VARIABLE_SCOPE):
+        graph_root = yl.load(MODEL_YAML_PATH)
+        tags = graph_root.build(feed_dict={
+            'root': input_batch, 'label': label_batch, 'turn_weight': weight_batch})
+
+    # get optimizer for train
+    train = tf.get_default_graph().get_operation_by_name(
+            namespace.optimizer)
+
+    # create saver and logger
+    saver = tf.train.Saver()
+    merged = tf.merge_all_summaries()
+
+    # ready to run
+
+    print('initialize')
+    writer = tf.train.SummaryWriter(namespace.logdir, sess.graph)
+    sess.run(tf.initialize_all_variables())
+
+    # run
+
+    if namespace.restore:
+        print('restore {}'.format(namespace.restore))
+        saver.restore(sess, namespace.restore)
+
+    writer.add_graph(tf.get_default_graph())
+
+    print('convert records')
+
+    print('train')
+
+    for t in load_threads: t.start()
+
+    rate_total = 0.
+    rate_count = 0
+    correct_rate_op = tags['rate']
+
+    for i in range(0, 100000):
+        rate = sess.run( (correct_rate_op), feed_dict={} )
+        rate_count += 1
+        rate_total += rate / rate_count
+
+    print('correct rate: {}'.format(rate_total))
+
+    # finalize
+    coordinator.request_stop()
+    coordinator.join(load_threads)
+    writer.close()
 
 def do_eval(namespace):
     print('unavailable now')
