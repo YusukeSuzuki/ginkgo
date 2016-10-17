@@ -107,3 +107,49 @@ training plan(prophet/enforcer)
 - floodgate client
 - usi backend
 
+workflow
+================================================================================
+
+```bash
+# assume 130 turn per match
+
+# pre train prophet
+python train_prophet_with_records.py --out=prophet_pret_e000.ckpt --optimizer=...
+python train_prophet_with_records.py --in=prophet_pret_e000.ckpt --out=prophet_pret_e001.ckpt --optimizer=...
+python train_prophet_with_records.py --in=prophet_pret_e001.ckpt --out=prophet_pret_e002.ckpt --optimizer=...
+python train_prophet_with_records.py --in=prophet_pret_e002.ckpt --out=prophet_pret_e003.ckpt --optimizer=...
+python train_prophet_with_records.py --in=prophet_pret_e003.ckpt --out=prophet_pret_e004.ckpt --optimizer=...
+
+cp prophet_pret_e004.ckpt latest_prophet_model.ckpt
+
+# pre train enforcer
+python train_enforcer_with_random.py --num=100000 --out=enforcer_random_e000.ckpt --optimizer=...
+
+cp enforcer_random_e000.ckpt latest_prophet_model.ckpt
+
+# pre train enforcer
+python train_enforcer_with_records.py --in=enforcer_random_e000.ckpt --out=enforcer_pret_e000.ckpt --optimizer=...
+python train_enforcer_with_records.py --in=enforcer_pret_e000.ckpt   --out=enforcer_pret_e001.ckpt --optimizer=...
+python train_enforcer_with_records.py --in=enforcer_pret_e001.ckpt   --out=enforcer_pret_e002.ckpt --optimizer=...
+python train_enforcer_with_records.py --in=enforcer_pret_e002.ckpt   --out=enforcer_pret_e003.ckpt --optimizer=...
+python train_enforcer_with_records.py --in=enforcer_pret_e003.ckpt   --out=enforcer_pret_e004.ckpt --optimizer=...
+
+cp enforcer_pret_e004.ckpt latest_enforcer_model.ckpt
+
+# generate autonomous matching log
+
+for i in {0..10}; do
+    DATENAME=`date +%Y%m%d-%H%M%S-%N`
+
+    python self_match.py --match-num=5000 \
+        --prefetch-depth=3 \
+        --prefetch-width=3 \
+        --matching-logdir=latest_matches \
+        --enforcer=latest_enforcer_model.ckpt \
+        --prophet=latest_prophet_model.ckpt
+
+    python train_prophet_with_records.py  --in=latest_prophet_model.ckpt --out=latest_prophet_model.ckpt --optimizer=...
+    python train_enforcer_with_records.py --in=latest_enforcer_model.ckpt --out=latest_enforcer_model.ckpt --optimizer=...
+done
+```
+
