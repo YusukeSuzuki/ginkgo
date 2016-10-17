@@ -392,6 +392,32 @@ class Conv2dAELoss(yaml.YAMLObject, Node):
         with tf.variable_scope(self.variable_scope) if self.variable_scope else WithNone():
             return nids, self.nid, tf.squared_difference(source1, source2, name=self.name)
 
+class GlobalStep(yaml.YAMLObject, Node):
+    yaml_tag = u'!global_step'
+
+    def __init__(self, loader, node):
+        params = {
+            'nid': (str, None, []),
+            'tags': (nop, [], [is_typeof(list)]),
+            'name': (str, None, []),
+            }
+        self.parse(loader, node, params)
+
+    def __repr__(self):
+        return 'GlobalStep'
+
+    @classmethod
+    def from_yaml(cls, loader, node):
+        return cls(loader, node)
+
+    def create_node(self, nids, exclude_tags):
+        global_step = tf.get_variable(
+            'global_step', (),
+            initializer=tf.constant_initializer(0), trainable=False)
+
+        return nids, self.nid, global_step 
+
+
 class AdamOptimizer(yaml.YAMLObject, Node):
     yaml_tag = u'!adam_optimizer'
 
@@ -400,6 +426,7 @@ class AdamOptimizer(yaml.YAMLObject, Node):
             'nid': (str, None, []),
             'tags': (nop, [], [is_typeof(list)]),
             'source': (nop, None, [is_exist]),
+            'global_step': (nop, None, []),
             'val': (float, 1e-4, []),
             'takelog': (bool, False, []),
             'name': (str, None, []),
@@ -415,10 +442,7 @@ class AdamOptimizer(yaml.YAMLObject, Node):
 
     def create_node(self, nids, exclude_tags):
         source_node = nids[self.source]
-
-        global_step = tf.get_variable(
-            'global_step', (),
-            initializer=tf.constant_initializer(0), trainable=False)
+        global_step = nids[self.global_step] if self.global_step is not None else None
 
         if self.takelog:
             opt = tf.train.AdamOptimizer(self.val)

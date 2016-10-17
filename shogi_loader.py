@@ -5,6 +5,7 @@ import tensorflow as tf
 import numpy as np
 
 from threading import Thread
+import queue
 from queue import Queue
 import math
 from concurrent.futures import ProcessPoolExecutor as Executor
@@ -13,6 +14,9 @@ def record_to_vec(r):
     sfen, side, turn, total, move, winner = r
 
     board_vec = numpy_shogi.sfen_to_vector(sfen, usi=move)
+
+    if side == 'w':
+        board_vec = numpy_shogi.player_inverse(board_vec)
     
     match_vec = np.array([
         1.0 if side == winner else 0.0,
@@ -24,28 +28,35 @@ def record_to_vec(r):
 
 def map_func(r):
     sfen, side, turn, total, move, winner = r = sr.to_data(r)
-    if side != 'b': return None
     if int(turn) < 30: return None
 
+    #if side != 'b': return None
+
     board_vec, label_vec, weight_vec = record_to_vec(r)
+
     return (
         np.expand_dims(board_vec,0),
         np.expand_dims(label_vec,0),
         np.expand_dims(weight_vec,0))
 
-def load_loop(coord, sess, enqueue_op, path_q, pool,
-        input_vector_ph, label_ph, turn_weight_ph):
+def flipdata(r):
+    return (numpy_shogi.fliplr(r[0]), r[1], r[2])
 
+def load_loop(coord, sess, enqueue_op, close_op,  path_q, pool, loop,
+        input_vector_ph, label_ph, turn_weight_ph):
 
     while not coord.should_stop():
         try:
-            path = path_q.get()
+            path = path_q.get(timeout=10)
 
             records = sr.load_file(path)
 
             #sfen, side, turn, total, move, winner = r = sr.to_data(r)
             data_list = list(pool.map(map_func, records))
             data_list = list(filter(lambda x: x is not None, data_list))
+
+            data_list2 = list(pool.map(flipdata, data_list))
+            data_list.extend(data_list2)
 
             vecs = [list(t) for t in zip(*data_list)]
             vecs = list(map(np.concatenate, vecs))
@@ -59,25 +70,32 @@ def load_loop(coord, sess, enqueue_op, path_q, pool,
                 label_ph: vecs[1],
                 turn_weight_ph: vecs[2]})
 
-            path_q.put(path)
+            if loop:
+                path_q.put(path)
+
+        except queue.Empty  as e:
+            try:
+                sess.run(close_op)
+            except tf.errors.CancelledError:
+                pass
+            break
         except tf.errors.AbortedError as e:
-            print(e)
             break
         except tf.errors.CancelledError as e:
-            print(e)
             break
 
 def load_sfenx_threads_and_queue(
-        coord, sess, path_list, batch_size, threads_num=1):
+        coord, sess, path_list, batch_size, loop=False, threads_num=1):
 
-    input_vector_ph = tf.placeholder(tf.float32, [None,9,9,148])
+    input_vector_ph = tf.placeholder(tf.float32, [None,9,9,360])
     label_ph = tf.placeholder(tf.float32, [None,2])
     turn_weight_ph = tf.placeholder(tf.float32, [None,1])
 
     q = tf.RandomShuffleQueue(50000, 8000,
-        [tf.float32, tf.float32, tf.float32], [[9,9,148], [2], [1]])
+        [tf.float32, tf.float32, tf.float32], [[9,9,360], [2], [1]])
     enqueue_op = q.enqueue_many(
         [input_vector_ph, label_ph, turn_weight_ph])
+    close_op = q.close()
     path_q = Queue()
 
     for p in path_list:
@@ -86,7 +104,7 @@ def load_sfenx_threads_and_queue(
     pool = Executor(max_workers=threads_num+2)
 
     threads = [Thread(target=load_loop,
-        args=(coord, sess, enqueue_op, path_q, pool,
+        args=(coord, sess, enqueue_op, close_op, path_q, pool, loop,
             input_vector_ph, label_ph, turn_weight_ph))
         for i in range(threads_num)]
 

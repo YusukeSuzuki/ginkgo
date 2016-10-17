@@ -3,7 +3,7 @@
 user_variables:
   - op_device: &op_device '/cpu:0'
 # graph data tree
-# input: [-1,9,9,148]
+# input: [-1,9,9,360]
 root: !root
   nodes_required: ['root']
   nodes:
@@ -96,11 +96,12 @@ root: !root
 #      - !placeholder
 #        { nid: turn_weight, name: turn_weight,
 #          tag: train, dtype: tf.float32, shape: [null,1]}
+      - !global_step {tag: train, nid: global_step }
       - !prophet_loss
           { nid: p_loss, tag: train,
             source1: out, source2: label, source3: turn_weight }
-      - !adam_optimizer {tag: train, name: optimizer, source: p_loss, val: 1e-4, takelog: false}
-      - !correct_rate {tag: train, nid: rate, x1: label, x2: out}
+      - !adam_optimizer {tag: train, name: optimizer, source: p_loss, val: 1e-4, takelog: false, global_step: global_step }
+      - !correct_rate {tag: train, nid: rate, x1: label, x2: out }
     - !with
       variable_scope: log
       device_scope: '/cpu:0'
