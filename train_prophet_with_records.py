@@ -73,8 +73,6 @@ def do_train(namespace):
 
     writer.add_graph(tf.get_default_graph())
 
-    print('convert records')
-
     print('train')
 
     for t in load_threads: t.start()
@@ -138,10 +136,6 @@ def do_test(namespace):
         tags = graph_root.build(feed_dict={
             'root': input_batch, 'label': label_batch, 'turn_weight': weight_batch})
 
-    # get optimizer for train
-    train = tf.get_default_graph().get_operation_by_name(
-            namespace.optimizer)
-
     # create saver and logger
     saver = tf.train.Saver()
     merged = tf.merge_all_summaries()
@@ -153,6 +147,10 @@ def do_test(namespace):
     sess.run(tf.initialize_all_variables())
 
     # run
+    
+    ckpt = tf.train.get_checkpoint_state('models')
+    print(ckpt)
+    print(ckpt.model_checkpoint_path)
 
     if namespace.restore:
         print('restore {}'.format(namespace.restore))
@@ -160,20 +158,31 @@ def do_test(namespace):
 
     writer.add_graph(tf.get_default_graph())
 
-    print('convert records')
-
-    print('train')
+    print('test')
 
     for t in load_threads: t.start()
 
     rate_total = 0.
+    rate_avg = 0.
     rate_count = 0
+    rate_min = 2.
+    rate_max = -1
     correct_rate_op = tags['rate']
 
-    for i in range(0, 100000):
-        rate = sess.run( (correct_rate_op), feed_dict={} )
-        rate_count += 1
-        rate_total += rate / rate_count
+    try:
+        while not coordinator.should_stop():
+            rate = sess.run( (correct_rate_op), feed_dict={} )
+            rate_count += 1
+            rate_min = min(rate_min, rate)
+            rate_max = max(rate_max, rate)
+            rate_total += rate
+            rate_avg = rate_total / rate_count
+
+            if rate_count % 10 == 0:
+                print('correct rate({}): avg {}, min {}, max {}'.format(
+                    rate_count, rate_avg, rate_min, rate_max))
+    except tf.errors.OutOfRangeError as e:
+        print('sample exausted')
 
     print('correct rate: {}'.format(rate_total))
 
