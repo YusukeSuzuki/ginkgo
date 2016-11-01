@@ -107,6 +107,38 @@ training plan(prophet/enforcer)
 - floodgate client
 - usi backend
 
+storage/directory
+================================================================================
+
+- ginkgo
+  - ginkgo
+  - data
+  - series
+    - series-001
+      - 00000000-000000-000-initial
+      - 20161101-101005-008-train-prophet-with-records
+      - YYYYmmdd-HHMMSS-nnn-train-prophet-with-records
+      - YYYYmmdd-HHMMSS-nnn-train-prophet-with-records
+      - YYYYmmdd-HHMMSS-nnn-train-prophet-with-records
+      - YYYYmmdd-HHMMSS-nnn-train-prophet-with-records
+      - YYYYmmdd-HHMMSS-nnn-train-enforcer-with-records
+      - YYYYmmdd-HHMMSS-nnn-train-enforcer-with-random
+      - YYYYmmdd-HHMMSS-nnn-train-enforcer-with-random
+      - YYYYmmdd-HHMMSS-nnn-train-enforcer-with-random
+      - YYYYmmdd-HHMMSS-nnn-train-enforcer-with-random
+      - YYYYmmdd-HHMMSS-nnn-train-enforcer-with-random
+      - YYYYmmdd-HHMMSS-nnn-auto-match
+      - YYYYmmdd-HHMMSS-nnn-train-prophet-with-match-result
+      - YYYYmmdd-HHMMSS-nnn-train-enforcer-with-match-result
+      - YYYYmmdd-HHMMSS-nnn-auto-match
+      - YYYYmmdd-HHMMSS-nnn-train-prophet-with-match-result
+      - YYYYmmdd-HHMMSS-nnn-train-enforcer-with-match-result
+      - YYYYmmdd-HHMMSS-nnn-auto-match
+      - YYYYmmdd-HHMMSS-nnn-train-prophet-with-match-result
+      - YYYYmmdd-HHMMSS-nnn-train-enforcer-with-match-result
+    - series-002
+    - series-003
+
 workflow
 ================================================================================
 
@@ -139,7 +171,7 @@ cp enforcer_pret_e004.ckpt latest_enforcer_model.ckpt
 # generate autonomous matching log
 
 for i in {0..10}; do
-    DATENAME=`date +%Y%m%d-%H%M%S-%N`
+    DATENAME=`date +%Y%m%d-%H%M%S-%3N`
 
     python self_match.py --match-num=5000 \
         --prefetch-depth=3 \
@@ -152,4 +184,9 @@ for i in {0..10}; do
     python train_enforcer_with_records.py --in=latest_enforcer_model.ckpt --out=latest_enforcer_model.ckpt --optimizer=...
 done
 ```
+
+multi GPU and distribution
+================================================================================
+
+
 
