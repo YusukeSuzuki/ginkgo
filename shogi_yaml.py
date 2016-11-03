@@ -66,6 +66,7 @@ class CorrectRate(yaml.YAMLObject, yl.Node):
             rate = tf.reduce_mean(tf.cast(corrects, tf.float32))
 
             with tf.device('/cpu:0'):
-                tf.scalar_summary('correct_raet', rate)
+                tf.scalar_summary('correct_rate/'+rate.device, rate)
+
             return nids, self.nid, rate
 

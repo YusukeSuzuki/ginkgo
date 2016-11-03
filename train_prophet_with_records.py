@@ -26,19 +26,40 @@ MINI_BATCH_SIZE = 100
 # sub commands
 # ------------------------------------------------------------
 
+def average_gradients(tower_grads):
+    average_grads = []
+    for grad_and_vars in zip(*tower_grads):
+        grads = []
+        
+        for g, u in grad_and_vars:
+            #print(g)
+            #print(u.name)
+            expanded_g = tf.expand_dims(g,0)
+            grads.append(expanded_g)
+
+        grad = tf.concat(0,grads)
+        grad = tf.reduce_mean(grad,0)
+
+        v = grad_and_vars[0][1]
+        grad_and_var = (grad, v)
+        average_grads.append(grad_and_var)
+
+    return average_grads
+
 def do_train(namespace):
     models_dir = Path(MODELS_DIR)
     models_dir.mkdir(parents=True, exist_ok=True)
     model_path = models_dir/namespace.modelfile
     model_backup_path = models_dir/(namespace.modelfile+'.back')
 
-    sess = tf.Session()
-    coordinator = tf.train.Coordinator()
-
     # build read data threads
     path_list = list(Path('data/train').glob('*.csa'))
 
     with tf.Graph().as_default(), tf.device('/cpu:0'):
+        sess = tf.Session( config=tf.ConfigProto(
+            allow_soft_placement=True, log_device_placement=False))
+        coordinator = tf.train.Coordinator()
+
         global_step = tf.get_variable(
             'global_step', [],
             initializer=tf.constant_initializer(0), trainable=False)
@@ -49,19 +70,19 @@ def do_train(namespace):
         with tf.variable_scope('input'):
             load_threads, input_batch, label_batch, weight_batch = \
                 shogi_loader.load_sfenx_threads_and_queue(
-                    coordinator, sess, path_list, MINI_BATCH_SIZE, threads_num=8)
+                    coordinator, sess, path_list, MINI_BATCH_SIZE, threads_num=24)
 
         tower_grads = []
 
         for i in range(namespace.num_gpus):
-            with tf.device('/gpu:{}'.format()):
+            with tf.device('/gpu:{}'.format(i)):
                 with tf.name_scope('tower_{}'.format(i)) as scope:
                     graph_root = yl.load(MODEL_YAML_PATH)
                     tags = graph_root.build(feed_dict={
                         'root': input_batch, 'label': label_batch, 'turn_weight': weight_batch})
                     loss = tags['p_loss']
 
-                    tf.get_variable_scope().reuse_variable()
+                    tf.get_variable_scope().reuse_variables()
 
                     summaries = tf.get_collection(tf.GraphKeys.SUMMARIES, scope)
                     grads = opt.compute_gradients(loss)
@@ -69,17 +90,65 @@ def do_train(namespace):
 
         grads = average_gradients(tower_grads)
 
-        for grad, var in grads:
-          if grad is not None:
-            summaries.append(
-                tf.histogram_summary(var.op.name + '/gradients', grad))
-
         apply_gradient_op = opt.apply_gradients(grads, global_step=global_step)
 
         for var in tf.trainable_variables():
             summaries.append(tf.histogram_summary(var.op.name, var))
 
-        # to be implemented
+        train_op = apply_gradient_op
+
+        saver = tf.train.Saver()
+        merged = tf.merge_all_summaries()
+
+        print('initialize')
+        writer = tf.train.SummaryWriter(namespace.logdir, sess.graph)
+        sess.run(tf.initialize_all_variables())
+
+        if namespace.restore:
+            print('restore {}'.format(namespace.restore))
+            saver.restore(sess, namespace.restore)
+
+        writer.add_graph(tf.get_default_graph())
+
+        print('train')
+
+        for t in load_threads: t.start()
+
+        gs = -1
+
+        try:
+            while not coordinator.should_stop():
+                if gs % 5 == 0:
+                    summary, res, gs = sess.run( (merged, train_op, global_step), feed_dict={} )
+                    writer.add_summary(summary, gs)
+                else:
+                    res, gs = sess.run( (train_op, global_step), feed_dict={} )
+
+                gs = int(gs)
+
+                print('loop: {}'.format(gs))
+
+                if gs > 10 and gs % 4000 == 1:
+                    print('save backup to: {}'.format(model_backup_path))
+                    saver.save(sess, str(model_backup_path))
+
+                if gs < 100 and gs % 10:
+                    writer.flush()
+                if gs < 2000 and gs % 100:
+                    writer.flush()
+                if gs < 5000 and gs % 200:
+                    writer.flush()
+        except tf.errors.OutOfRangeError as e:
+            print('sample exausted')
+
+        print('save to: {}'.format(model_path))
+        saver.save(sess, str(model_path))
+
+        # finalize
+        coordinator.request_stop()
+        coordinator.join(load_threads)
+        writer.close()
+
     return None
 
     # old code

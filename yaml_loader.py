@@ -253,7 +253,7 @@ class Linear(yaml.YAMLObject, Node):
         with tf.variable_scope(self.variable_scope) if self.variable_scope else WithNone():
             w = weight_variable(
                 [source_length,self.length], dev=1.0e-3, name="weight")
-            b = bias_variable([self.length], val=self.b_init, name="bias")
+            #b = bias_variable([self.length], val=self.b_init, name="bias")
             mul = tf.matmul(source_node, w)
 
         return nids, self.nid, mul
@@ -450,7 +450,7 @@ class AdamOptimizer(yaml.YAMLObject, Node):
 
             for grad, var in grads:
                 if grad is not None:
-                    tf.histogram_summary('grads/'+var.name, grad)
+                    tf.histogram_summary('grads/'+var.name+'/'+grads.device, grad)
             apply_gradient_op = opt.apply_gradients(grads, global_step=global_step, name=self.name)
 
             return nids, self.nid, apply_gradient_op
@@ -724,7 +724,7 @@ class ScalarSummary(yaml.YAMLObject, Node):
         source_node = nids[self.source]
 
         return nids, self.nid, tf.scalar_summary(
-            self.summary_tag, source_node, name=self.name)
+            self.summary_tag+'/'+source_node.device, source_node, name=self.name)
 
 class ImageSummary(yaml.YAMLObject, Node):
     yaml_tag = u'!image_summary'
