@@ -107,3 +107,17 @@ training plan(prophet/enforcer)
 - floodgate client
 - usi backend
 
+ワークサイクル
+================================================================================
+
+- model root(eg, ginkgo-2016-10-25)
+  - ginkgo (source dir)
+  - models
+  - logs
+  - autonomous-records
+    - 20161025-101005-999999
+      0000000.sfenx
+      0000001.sfenx
+      0000002.sfenx
+  - 2chkifu-data
+

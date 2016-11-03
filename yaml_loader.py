@@ -448,10 +448,9 @@ class AdamOptimizer(yaml.YAMLObject, Node):
             opt = tf.train.AdamOptimizer(self.val)
             grads = opt.compute_gradients(source_node)
 
-            with tf.device('/cpu:0'):
-                for grad, var in grads:
-                    if grad is not None:
-                        tf.histogram_summary('grads/'+var.name, grad)
+            for grad, var in grads:
+                if grad is not None:
+                    tf.histogram_summary('grads/'+var.name, grad)
             apply_gradient_op = opt.apply_gradients(grads, global_step=global_step, name=self.name)
 
             return nids, self.nid, apply_gradient_op

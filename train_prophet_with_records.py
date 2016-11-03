@@ -37,7 +37,58 @@ def do_train(namespace):
 
     # build read data threads
     path_list = list(Path('data/train').glob('*.csa'))
-    #path_list = list(Path('data/exper').glob('*.csa'))
+
+    with tf.Graph().as_default(), tf.device('/cpu:0'):
+        global_step = tf.get_variable(
+            'global_step', [],
+            initializer=tf.constant_initializer(0), trainable=False)
+
+        opt = tf.train.AdamOptimizer(1e-4)
+
+        # build read data threads
+        with tf.variable_scope('input'):
+            load_threads, input_batch, label_batch, weight_batch = \
+                shogi_loader.load_sfenx_threads_and_queue(
+                    coordinator, sess, path_list, MINI_BATCH_SIZE, threads_num=8)
+
+        tower_grads = []
+
+        for i in range(namespace.num_gpus):
+            with tf.device('/gpu:{}'.format()):
+                with tf.name_scope('tower_{}'.format(i)) as scope:
+                    graph_root = yl.load(MODEL_YAML_PATH)
+                    tags = graph_root.build(feed_dict={
+                        'root': input_batch, 'label': label_batch, 'turn_weight': weight_batch})
+                    loss = tags['p_loss']
+
+                    tf.get_variable_scope().reuse_variable()
+
+                    summaries = tf.get_collection(tf.GraphKeys.SUMMARIES, scope)
+                    grads = opt.compute_gradients(loss)
+                    tower_grads.append(grads)
+
+        grads = average_gradients(tower_grads)
+
+        for grad, var in grads:
+          if grad is not None:
+            summaries.append(
+                tf.histogram_summary(var.op.name + '/gradients', grad))
+
+        apply_gradient_op = opt.apply_gradients(grads, global_step=global_step)
+
+        for var in tf.trainable_variables():
+            summaries.append(tf.histogram_summary(var.op.name, var))
+
+        # to be implemented
+    return None
+
+    # old code
+
+    sess = tf.Session()
+    coordinator = tf.train.Coordinator()
+
+    # build read data threads
+    path_list = list(Path('data/train').glob('*.csa'))
 
     with tf.variable_scope('input'), tf.device('/cpu:0'):
         load_threads, input_batch, label_batch, weight_batch = \
@@ -251,6 +302,7 @@ def create_parser():
     sub_parser.add_argument('--optimizer', type=str, required=True)
     sub_parser.add_argument('--samples', type=str, default='./samples')
     sub_parser.add_argument('--trainable-scope', type=str, default='')
+    sub_parser.add_argument('--num-gpus', type=int, default=1)
 
     sub_parser = sub_parsers.add_parser('test')
     sub_parser.set_defaults(func=do_test)
