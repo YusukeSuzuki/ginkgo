@@ -107,3 +107,86 @@ training plan(prophet/enforcer)
 - floodgate client
 - usi backend
 
+storage/directory
+================================================================================
+
+- ginkgo
+  - ginkgo
+  - data
+  - series
+    - series-001
+      - 00000000-000000-000-initial
+      - 20161101-101005-008-train-prophet-with-records
+      - YYYYmmdd-HHMMSS-nnn-train-prophet-with-records
+      - YYYYmmdd-HHMMSS-nnn-train-prophet-with-records
+      - YYYYmmdd-HHMMSS-nnn-train-prophet-with-records
+      - YYYYmmdd-HHMMSS-nnn-train-prophet-with-records
+      - YYYYmmdd-HHMMSS-nnn-train-enforcer-with-records
+      - YYYYmmdd-HHMMSS-nnn-train-enforcer-with-random
+      - YYYYmmdd-HHMMSS-nnn-train-enforcer-with-random
+      - YYYYmmdd-HHMMSS-nnn-train-enforcer-with-random
+      - YYYYmmdd-HHMMSS-nnn-train-enforcer-with-random
+      - YYYYmmdd-HHMMSS-nnn-train-enforcer-with-random
+      - YYYYmmdd-HHMMSS-nnn-auto-match
+      - YYYYmmdd-HHMMSS-nnn-train-prophet-with-match-result
+      - YYYYmmdd-HHMMSS-nnn-train-enforcer-with-match-result
+      - YYYYmmdd-HHMMSS-nnn-auto-match
+      - YYYYmmdd-HHMMSS-nnn-train-prophet-with-match-result
+      - YYYYmmdd-HHMMSS-nnn-train-enforcer-with-match-result
+      - YYYYmmdd-HHMMSS-nnn-auto-match
+      - YYYYmmdd-HHMMSS-nnn-train-prophet-with-match-result
+      - YYYYmmdd-HHMMSS-nnn-train-enforcer-with-match-result
+    - series-002
+    - series-003
+
+workflow
+================================================================================
+
+```bash
+# assume 130 turn per match
+
+# pre train prophet
+python train_prophet_with_records.py --out=prophet_pret_e000.ckpt --optimizer=...
+python train_prophet_with_records.py --in=prophet_pret_e000.ckpt --out=prophet_pret_e001.ckpt --optimizer=...
+python train_prophet_with_records.py --in=prophet_pret_e001.ckpt --out=prophet_pret_e002.ckpt --optimizer=...
+python train_prophet_with_records.py --in=prophet_pret_e002.ckpt --out=prophet_pret_e003.ckpt --optimizer=...
+python train_prophet_with_records.py --in=prophet_pret_e003.ckpt --out=prophet_pret_e004.ckpt --optimizer=...
+
+cp prophet_pret_e004.ckpt latest_prophet_model.ckpt
+
+# pre train enforcer
+python train_enforcer_with_random.py --num=100000 --out=enforcer_random_e000.ckpt --optimizer=...
+
+cp enforcer_random_e000.ckpt latest_prophet_model.ckpt
+
+# pre train enforcer
+python train_enforcer_with_records.py --in=enforcer_random_e000.ckpt --out=enforcer_pret_e000.ckpt --optimizer=...
+python train_enforcer_with_records.py --in=enforcer_pret_e000.ckpt   --out=enforcer_pret_e001.ckpt --optimizer=...
+python train_enforcer_with_records.py --in=enforcer_pret_e001.ckpt   --out=enforcer_pret_e002.ckpt --optimizer=...
+python train_enforcer_with_records.py --in=enforcer_pret_e002.ckpt   --out=enforcer_pret_e003.ckpt --optimizer=...
+python train_enforcer_with_records.py --in=enforcer_pret_e003.ckpt   --out=enforcer_pret_e004.ckpt --optimizer=...
+
+cp enforcer_pret_e004.ckpt latest_enforcer_model.ckpt
+
+# generate autonomous matching log
+
+for i in {0..10}; do
+    DATENAME=`date +%Y%m%d-%H%M%S-%3N`
+
+    python self_match.py --match-num=5000 \
+        --prefetch-depth=3 \
+        --prefetch-width=3 \
+        --matching-logdir=latest_matches \
+        --enforcer=latest_enforcer_model.ckpt \
+        --prophet=latest_prophet_model.ckpt
+
+    python train_prophet_with_records.py  --in=latest_prophet_model.ckpt --out=latest_prophet_model.ckpt --optimizer=...
+    python train_enforcer_with_records.py --in=latest_enforcer_model.ckpt --out=latest_enforcer_model.ckpt --optimizer=...
+done
+```
+
+multi GPU and distribution
+================================================================================
+
+
+
