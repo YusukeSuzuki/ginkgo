@@ -1,5 +1,5 @@
-import numpy_shogi
-import shogi_records as sr
+import ginkgo.numpy_shogi as numpy_shogi
+import ginkgo.shogi_records as sr
 
 import tensorflow as tf
 import numpy as np

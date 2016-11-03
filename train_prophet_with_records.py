@@ -9,11 +9,11 @@ import tensorflow as tf
 import numpy as np
 import shogi
 
-import yaml_loader as yl
-import numpy_shogi
-import shogi_yaml
-import shogi_records
-import shogi_loader
+import ginkgo.yaml_loader as yl
+import ginkgo.numpy_shogi as numpy_shogi
+import ginkgo.shogi_yaml
+import ginkgo.shogi_records as shogi_records
+import ginkgo.shogi_loader as shogi_loader
 
 
 ROOT_VARIABLE_SCOPE='prophet'

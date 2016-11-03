@@ -1,6 +1,6 @@
 import tensorflow as tf
 import yaml
-import yaml_loader as yl
+import ginkgo.yaml_loader as yl
 
 class ProphetLoss(yaml.YAMLObject, yl.Node):
     yaml_tag = u'!prophet_loss'
