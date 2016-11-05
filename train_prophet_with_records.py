@@ -51,6 +51,7 @@ def do_train(ns):
 
     # build read data threads
     path_list = list(Path(ns.samples).glob('*.csa'))
+    shuffle(path_list)
 
     with tf.Graph().as_default(), tf.device('/cpu:0'):
         sess = tf.Session( config=tf.ConfigProto(
