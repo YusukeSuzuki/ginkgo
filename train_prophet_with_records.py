@@ -68,7 +68,8 @@ def do_train(ns):
         with tf.variable_scope('input'):
             load_threads, input_batch, label_batch, weight_batch = \
                 shogi_loader.load_sfenx_threads_and_queue(
-                    coordinator, sess, path_list, MINI_BATCH_SIZE, threads_num=24)
+                    coordinator, sess, path_list,
+                    ns.batch_size, threads_num=24)
 
         tower_grads = []
 
@@ -296,6 +297,7 @@ def create_parser():
     sub_parser.add_argument('--modeldir', type=str)
     sub_parser.add_argument('--samples', type=str)
     sub_parser.add_argument('--num-gpus', type=int, default=1)
+    sub_parser.add_argument('--batch-size', type=int, default=MINI_BATCH_SIZE)
 
     sub_parser = sub_parsers.add_parser('test')
     sub_parser.set_defaults(func=do_test)
