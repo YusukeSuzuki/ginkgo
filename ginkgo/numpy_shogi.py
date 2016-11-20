@@ -1,3 +1,4 @@
+from itertools import product
 import shogi as sh
 import numpy as np
 
@@ -29,6 +30,8 @@ PT2VM = {
     sh.PROM_PAWN: 13,
     }
 
+VM2PT = { v: k for k,v in PT2VM.items()}
+
 PROMS = {
     PT2VM[sh.ROOK]: PT2VM[sh.PROM_ROOK],
     PT2VM[sh.BISHOP]: PT2VM[sh.PROM_BISHOP],
@@ -40,9 +43,25 @@ PROMS = {
 
 IN_HANDS_TYPE = { 1: 'R', 3: 'B', 5: 'G', 6: 'S', 8: 'N', 10:'L', 12:'P', }
 
+#            0  1  2   3   4   5   6   7   8   9  10  11  12   13
 #            k  r  R   b   B   g   s   S   n   N   l   L   p    P
 TypeHeads = [0, 2, 8, 12, 18, 22, 30, 42, 50, 62, 70, 82, 90, 144,] # 180
 TypeSkips = [2, 3, 2,  3,  2,  2,  3,  2,  3,  2,  3,  2,  3,   2,] # 180
+TypeCounts= [1, 2, 2,  2,  2,  4,  4,  4,  4,  4,  4,  4, 18,  18,]
+
+def create_position_channels():
+    index = 0
+    positions = {}
+
+    for color in [0,1]:
+        for type_i, counts in enumerate(TypeCounts):
+            for n in range(counts):
+                positions[index] = (type_i, color)
+                index += TypeSkips[type_i]
+
+    return positions
+
+PositionChannles = create_position_channels()
 
 def skipped_board(board):
     sfen = board.sfen()
@@ -71,9 +90,12 @@ def sfen_to_vector(sfen, usi=None, debug=False):
     moves = [ [[] for i in range(81)], [[] for i in range(81)] ]
     drops = [ [[]] * len(PT2VM), [[]] * len(PT2VM) ]
 
+    #print(list(boards[0].legal_moves))
+    #print(list(boards[1].legal_moves))
+
     for side in sides:
         for move in boards[side].legal_moves:
-            if move.from_square is not None:
+            if move.drop_piece_type is None:
                 moves[side][move.from_square].append( move )
             else:
                 drops[side][PT2VM[move.drop_piece_type]].append( move )
@@ -128,7 +150,55 @@ def sfen_to_vector(sfen, usi=None, debug=False):
 def to_debug(vec):
     return np.transpose(vec, [0,3,1,2])
 
-def vector_to_usi_movement():
+def vector_to_board_and_moves(vec):
+    # assert vec shape
+    b = sh.Board()
+    b.clear()
+
+    moves = []
+
+    color = 0
+    pos_found = False
+    pos_sqr = None
+    pos_type = None
+
+    move_found = False
+
+    for ch, row, col in product(range(360), range(9), range(9)):
+        pre_color = color
+        color = 0 if ch < 180 else 1
+
+        if ch in PositionChannles:
+            if row == 0 and col == 0:
+                if move_found and not pos_found:
+                    b.pieces_in_hand[pre_color][VM2PT[pos_type]] += 1
+
+                pos_found = False
+                pos_sqr = None
+                pos_type, _ = PositionChannles[ch]
+
+            if vec[0][row][col][ch] > 0:
+                pos_found = True
+                pos_sqr = row * 9 + col
+                b.set_piece_at(
+                    pos_sqr, sh.Piece(VM2PT[pos_type], color))
+        else:
+            promote = False
+
+            if ch - 1 in PositionChannles:
+                if row == 0 and col == 0:
+                    move_found = False
+            else:
+                promote = True
+
+            if vec[0][row][col][ch] > 0:
+                move_found = True
+
+                #if pos_found:
+
+    return b, None
+
+def vector_to_usi_movement(board_vec, move_vec):
     pass
 
 def fliplr(vec):
@@ -169,7 +239,7 @@ if __name__ == '__main__':
         vec = to_debug(vec)
         print(vec)
 
-    if True:
+    if False:
         for i in range(20):
             board.push(choice(list(board.legal_moves)))
 
@@ -178,4 +248,10 @@ if __name__ == '__main__':
         vec = to_debug(vec)
         print(board)
         print(vec)
+
+    if True:
+        import collections
+        temp = collections.OrderedDict(sorted(PositionChannles.items()))
+        for k, v in temp.items():
+            print(k,v)
 
