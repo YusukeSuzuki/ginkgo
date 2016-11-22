@@ -83,22 +83,37 @@ def sfen_to_vector(sfen, usi=None, debug=False):
     if usi is not None:
         initial_board.push_usi(usi)
 
-    boards = [ initial_board, sh.Board(skipped_sfen(sfen)), ]
+    boards = [ initial_board, sh.Board(skipped_sfen(sfen)), ] if initial_board.turn == 0 else \
+        [ sh.Board(skipped_sfen(sfen)), initial_board, ] 
     sides = [0,1]
 
     # make moves and drops
     moves = [ [[] for i in range(81)], [[] for i in range(81)] ]
-    drops = [ [[]] * len(PT2VM), [[]] * len(PT2VM) ]
+    drops = [ [[] for i in range(len(PT2VM))], [[] for i in range(len(PT2VM))] ]
 
-    #print(list(boards[0].legal_moves))
-    #print(list(boards[1].legal_moves))
+    if False:
+        print('====')
+        print('len(PT2VM)',len(PT2VM))
+        print('drops',drops)
+        print('input legal moves 0: ', sorted([m.usi() for m in list(boards[0].legal_moves )]))
+        print('input legal moves 1: ', sorted([m.usi() for m in list(boards[1].legal_moves )]))
+        print('====')
 
     for side in sides:
         for move in boards[side].legal_moves:
+            #print('append move:', move.drop_piece_type, move)
             if move.drop_piece_type is None:
                 moves[side][move.from_square].append( move )
             else:
+                if False:
+                    print('drops[side][PT2VM[{}]={}].append( {} )'.format(
+                        move.drop_piece_type,PT2VM[move.drop_piece_type],move))
                 drops[side][PT2VM[move.drop_piece_type]].append( move )
+
+    if False:
+        for side in sides:
+            for ds in drops[side]:
+                print(side, ds)
 
     # make pieces
     pieces = [[],[]]
@@ -132,10 +147,23 @@ def sfen_to_vector(sfen, usi=None, debug=False):
             chP = ch_base[side] +  TypeHeads[p[1]] + p_cnt[side][p[1]] * TypeSkips[p[1]] + 2
 
             if p[0] is not None:
+                # position channel
                 to = sqr2rc(p[0])
                 vec[0][to[0]][to[1]][chB] = 1
 
+            for row, col in product(range(9), range(9)):
+                vec[0][row][col][chM] = -1
+                if chP not in PositionChannles:
+                    vec[0][row][col][chP] = -1
+
             for m in p[2]:
+                # movement channels
+                # print(m)
+                if False:
+                    if (ch_base[side] +  TypeHeads[p[1]]) == (ch_base[side] +  TypeHeads[PT2VM[sh.PAWN]]):
+                        print('pawn:',p[1], m)
+                    else:
+                        print('other', m)
                 to = sqr2rc(m.to_square)
                 tmp_ch = chM if not m.promotion else chP
                 vec[0][to[0]][to[1]][tmp_ch] = 1
@@ -155,7 +183,7 @@ def vector_to_board_and_moves(vec):
     b = sh.Board()
     b.clear()
 
-    moves = []
+    moves = [[],[]]
 
     color = 0
     pos_found = False
@@ -180,8 +208,7 @@ def vector_to_board_and_moves(vec):
             if vec[0][row][col][ch] > 0:
                 pos_found = True
                 pos_sqr = row * 9 + col
-                b.set_piece_at(
-                    pos_sqr, sh.Piece(VM2PT[pos_type], color))
+                b.set_piece_at(pos_sqr, sh.Piece(VM2PT[pos_type], color))
         else:
             promote = False
 
@@ -193,10 +220,14 @@ def vector_to_board_and_moves(vec):
 
             if vec[0][row][col][ch] > 0:
                 move_found = True
+                to_sqr = row * 9 + col
+                moves[color].append(
+                    sh.Move(pos_sqr, to_sqr, promotion=promote,
+                        drop_piece_type=(None if pos_sqr is not None else VM2PT[pos_type])).usi())
+            elif vec[0][row][col][ch] < 0:
+                move_found = True
 
-                #if pos_found:
-
-    return b, None
+    return b, moves
 
 def vector_to_usi_movement(board_vec, move_vec):
     pass
