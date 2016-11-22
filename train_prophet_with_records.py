@@ -32,8 +32,6 @@ def average_gradients(tower_grads):
         grads = []
         
         for g, u in grad_and_vars:
-            #print(g)
-            #print(u.name)
             expanded_g = tf.expand_dims(g,0)
             grads.append(expanded_g)
 
@@ -46,14 +44,14 @@ def average_gradients(tower_grads):
 
     return average_grads
 
-def do_train(namespace):
-    models_dir = Path(MODELS_DIR)
-    models_dir.mkdir(parents=True, exist_ok=True)
-    model_path = models_dir/namespace.modelfile
-    model_backup_path = models_dir/(namespace.modelfile+'.back')
+def do_train(ns):
+    models_dir = Path(ns.modeldir)
+    model_path = models_dir/ns.output_model
+    model_backup_path = models_dir/(ns.output_model+'.back')
 
     # build read data threads
-    path_list = list(Path('data/train').glob('*.csa'))
+    path_list = list(Path(ns.samples).glob('*.csa'))
+    shuffle(path_list)
 
     with tf.Graph().as_default(), tf.device('/cpu:0'):
         sess = tf.Session( config=tf.ConfigProto(
@@ -74,12 +72,13 @@ def do_train(namespace):
 
         tower_grads = []
 
-        for i in range(namespace.num_gpus):
+        for i in range(ns.num_gpus):
             with tf.device('/gpu:{}'.format(i)):
                 with tf.name_scope('tower_{}'.format(i)) as scope:
-                    graph_root = yl.load(MODEL_YAML_PATH)
+                    graph_root = yl.load(ns.prophet_yaml)
                     tags = graph_root.build(feed_dict={
-                        'root': input_batch, 'label': label_batch, 'turn_weight': weight_batch})
+                        'root': input_batch, 'label': label_batch,
+                        'turn_weight': weight_batch})
                     loss = tags['p_loss']
 
                     tf.get_variable_scope().reuse_variables()
@@ -101,12 +100,13 @@ def do_train(namespace):
         merged = tf.merge_all_summaries()
 
         print('initialize')
-        writer = tf.train.SummaryWriter(namespace.logdir, sess.graph)
+        writer = tf.train.SummaryWriter(ns.logdir, sess.graph)
         sess.run(tf.initialize_all_variables())
 
-        if namespace.restore:
-            print('restore {}'.format(namespace.restore))
-            saver.restore(sess, namespace.restore)
+        if ns.input_model:
+            print('restore {}'.format(ns.input_model))
+            input_model = ns.modeldir+'/'+ns.input_model
+            saver.restore(sess, input_model)
 
         writer.add_graph(tf.get_default_graph())
 
@@ -149,112 +149,28 @@ def do_train(namespace):
         coordinator.join(load_threads)
         writer.close()
 
-    return None
-
-    # old code
-
-    sess = tf.Session()
-    coordinator = tf.train.Coordinator()
-
-    # build read data threads
-    path_list = list(Path('data/train').glob('*.csa'))
-
-    with tf.variable_scope('input'), tf.device('/cpu:0'):
-        load_threads, input_batch, label_batch, weight_batch = \
-            shogi_loader.load_sfenx_threads_and_queue(
-                coordinator, sess, path_list, MINI_BATCH_SIZE,
-                threads_num=8)
-
-    # build model
-    with tf.variable_scope(ROOT_VARIABLE_SCOPE):
-        graph_root = yl.load(MODEL_YAML_PATH)
-        tags = graph_root.build(feed_dict={
-            'root': input_batch, 'label': label_batch, 'turn_weight': weight_batch})
-
-    # get optimizer for train
-    train = tf.get_default_graph().get_operation_by_name(
-            namespace.optimizer)
-
-    # create saver and logger
-    saver = tf.train.Saver()
-    merged = tf.merge_all_summaries()
-
-    # ready to run
-
-    print('initialize')
-    writer = tf.train.SummaryWriter(namespace.logdir, sess.graph)
-    sess.run(tf.initialize_all_variables())
-
-    # run
-
-    if namespace.restore:
-        print('restore {}'.format(namespace.restore))
-        saver.restore(sess, namespace.restore)
-
-    writer.add_graph(tf.get_default_graph())
-
-    print('train')
-
-    for t in load_threads: t.start()
-
-    global_step = sess.run(tags['global_step'])
-
-    try:
-        while not coordinator.should_stop():
-            if global_step % 5 == 0:
-                summary, res, global_step = sess.run( (merged, train, tags['global_step']), feed_dict={} )
-                writer.add_summary(summary, global_step)
-            else:
-                res, global_step = sess.run( (train, tags['global_step']), feed_dict={} )
-
-            global_step = int(global_step)
-
-            print('loop: {}'.format(global_step))
-
-            if global_step > 10 and global_step % 4000 == 1:
-                print('save backup to: {}'.format(model_backup_path))
-                saver.save(sess, str(model_backup_path))
-
-            if global_step < 100 and global_step % 10:
-                writer.flush()
-            if global_step < 2000 and global_step % 100:
-                writer.flush()
-            if global_step < 5000 and global_step % 200:
-                writer.flush()
-    except tf.errors.OutOfRangeError as e:
-        print('sample exausted')
-
-    print('save to: {}'.format(model_path))
-    saver.save(sess, str(model_path))
-
-    # finalize
-    coordinator.request_stop()
-    coordinator.join(load_threads)
-    writer.close()
-
-def do_test(namespace):
+def do_test(ns):
     models_dir = Path(MODELS_DIR)
-    models_dir.mkdir(parents=True, exist_ok=True)
-    model_path = models_dir/namespace.modelfile
-    model_backup_path = models_dir/(namespace.modelfile+'.back')
+    model_path = models_dir/ns.model
 
     sess = tf.Session()
     coordinator = tf.train.Coordinator()
 
     # build read data threads
-    path_list = list(Path('data/test').glob('*.csa'))
+    path_list = list(Path(ns.samples).glob('*.csa'))
 
     with tf.variable_scope('input'), tf.device('/cpu:0'):
         load_threads, input_batch, label_batch, weight_batch = \
             shogi_loader.load_sfenx_threads_and_queue(
                 coordinator, sess, path_list, MINI_BATCH_SIZE,
-                threads_num=8)
+                threads_num=24)
 
     # build model
     with tf.variable_scope(ROOT_VARIABLE_SCOPE):
-        graph_root = yl.load(MODEL_YAML_PATH)
+        graph_root = yl.load(ns.prophet_yaml)
         tags = graph_root.build(feed_dict={
-            'root': input_batch, 'label': label_batch, 'turn_weight': weight_batch})
+            'root': input_batch, 'label': label_batch,
+            'turn_weight': weight_batch})
 
     # create saver and logger
     saver = tf.train.Saver()
@@ -263,7 +179,7 @@ def do_test(namespace):
     # ready to run
 
     print('initialize')
-    writer = tf.train.SummaryWriter(namespace.logdir, sess.graph)
+    writer = tf.train.SummaryWriter(ns.logdir, sess.graph)
     sess.run(tf.initialize_all_variables())
 
     # run
@@ -272,9 +188,10 @@ def do_test(namespace):
     print(ckpt)
     print(ckpt.model_checkpoint_path)
 
-    if namespace.restore:
-        print('restore {}'.format(namespace.restore))
-        saver.restore(sess, namespace.restore)
+    if ns.input_model:
+        print('restore {}'.format(ns.input_model))
+        input_model = ns.modeldir+'/'+ns.input_model
+        saver.restore(sess, input_model)
 
     writer.add_graph(tf.get_default_graph())
 
@@ -311,10 +228,10 @@ def do_test(namespace):
     coordinator.join(load_threads)
     writer.close()
 
-def do_eval(namespace):
+def do_eval(ns):
     print('unavailable now')
 
-def do_dump_network(namespace):
+def do_dump_network(ns):
     # build
     with tf.variable_scope('input'), tf.device('/cpu:0'):
         input_vector = tf.placeholder(tf.float32, [MINI_BATCH_SIZE,9,9,360])
@@ -322,33 +239,37 @@ def do_dump_network(namespace):
         weight_vector = tf.placeholder(tf.float32, [MINI_BATCH_SIZE,1])
 
     with tf.variable_scope(ROOT_VARIABLE_SCOPE):
-        graph_root = yl.load(MODEL_YAML_PATH)
+        graph_root = yl.load(ns.prophet_yaml)
         tags = graph_root.build(feed_dict={
-            'root': input_vector, 'label': label_vector, 'turn_weight': weight_vector})
+            'root': input_vector, 'label': label_vector,
+            'turn_weight': weight_vector})
 
     print('-- variables')
     for variable in tf.all_variables():
-        if fnmatch.fnmatch(variable.name, namespace.pattern):
+        if fnmatch.fnmatch(variable.name, ns.pattern):
             print(variable.name)
 
     print('-- operations')
     for operation in tf.get_default_graph().get_operations():
-        if fnmatch.fnmatch(operation.name, namespace.pattern):
+        if fnmatch.fnmatch(operation.name, ns.pattern):
             print(operation.name)
 
-def do_dump_graph_log(namespace):
+def do_dump_graph_log(ns):
     # build
-    #print('exclude tags: {}'.format(namespace.exclude_tags.split(',')))
+    #print('exclude tags: {}'.format(ns.exclude_tags.split(',')))
 
     with tf.variable_scope('input'), tf.device('/cpu:0'):
-        input_vector = tf.placeholder(tf.float32, [1,9,9,360])
+        input_vector = tf.placeholder(tf.float32, [MINI_BATCH_SIZE,9,9,360])
+        label_vector = tf.placeholder(tf.float32, [MINI_BATCH_SIZE,2])
+        weight_vector = tf.placeholder(tf.float32, [MINI_BATCH_SIZE,1])
+
 
     with tf.variable_scope(ROOT_VARIABLE_SCOPE):
-        graph_root = yl.load(MODEL_YAML_PATH)
+        graph_root = yl.load(ns.prophet_yaml)
         tags = graph_root.build(feed_dict={'root': input_vector})
 
     sess = tf.Session()
-    writer = tf.train.SummaryWriter(namespace.logdir, sess.graph)
+    writer = tf.train.SummaryWriter(ns.logdir, sess.graph)
     init = tf.initialize_all_variables()
     sess.run(init)
     writer.add_graph(tf.get_default_graph())
@@ -362,19 +283,27 @@ def create_parser():
     parser = AP(prog='train_prophet_with_records')
     parser.set_defaults(func=None)
     parser.add_argument('--logdir', type=str, default='./logs')
-    parser.add_argument('--modelfile', type=str, default='model.ckpt')
-    parser.add_argument('--restore', type=str, default='')
+    #parser.add_argument('--modelfile', type=str, default='model.ckpt')
+    #parser.add_argument('--restore', type=str, default='')
+
     sub_parsers = parser.add_subparsers()
 
     sub_parser = sub_parsers.add_parser('train')
     sub_parser.set_defaults(func=do_train)
-    sub_parser.add_argument('--optimizer', type=str, required=True)
-    sub_parser.add_argument('--samples', type=str, default='./samples')
-    sub_parser.add_argument('--trainable-scope', type=str, default='')
+    sub_parser.add_argument('--input-model', type=str, default='')
+    sub_parser.add_argument('--output-model', type=str)
+    sub_parser.add_argument('--prophet-yaml', type=str)
+    sub_parser.add_argument('--modeldir', type=str)
+    sub_parser.add_argument('--samples', type=str)
     sub_parser.add_argument('--num-gpus', type=int, default=1)
 
     sub_parser = sub_parsers.add_parser('test')
     sub_parser.set_defaults(func=do_test)
+    sub_parser.add_argument('--model', type=str)
+    sub_parser.add_argument('--prophet-yaml', type=str)
+    sub_parser.add_argument('--modeldir', type=str)
+    sub_parser.add_argument('--samples', type=str)
+    sub_parser.add_argument('--num-gpus', type=int, default=1)
 
     sub_parser = sub_parsers.add_parser('eval')
     sub_parser.set_defaults(func=do_eval)
@@ -382,10 +311,12 @@ def create_parser():
     sub_parser = sub_parsers.add_parser('dump-network')
     sub_parser.set_defaults(func=do_dump_network)
     sub_parser.add_argument('--pattern', type=str, default='*')
+    sub_parser.add_argument('--prophet-yaml', type=str)
 
     sub_parser = sub_parsers.add_parser('dump-graph-log')
     sub_parser.set_defaults(func=do_dump_graph_log)
     sub_parser.add_argument('--exclude-tags', type=str, default='')
+    sub_parser.add_argument('--prophet-yaml', type=str)
 
     return parser
 
