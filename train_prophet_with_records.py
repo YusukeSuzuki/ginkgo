@@ -165,11 +165,10 @@ def do_test(ns):
                 threads_num=24)
 
     # build model
-    with tf.variable_scope(ROOT_VARIABLE_SCOPE):
-        graph_root = yl.load(ns.prophet_yaml)
-        tags = graph_root.build(feed_dict={
-            'root': input_batch, 'label': label_batch,
-            'turn_weight': weight_batch})
+    graph_root = yl.load(ns.prophet_yaml)
+    tags = graph_root.build(feed_dict={
+        'root': input_batch, 'label': label_batch,
+        'turn_weight': weight_batch})
 
     # create saver and logger
     saver = tf.train.Saver()
