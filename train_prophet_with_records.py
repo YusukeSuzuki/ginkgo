@@ -151,7 +151,6 @@ def do_train(ns):
 
 def do_test(ns):
     models_dir = Path(MODELS_DIR)
-    model_path = models_dir/ns.model
 
     sess = tf.Session()
     coordinator = tf.train.Coordinator()
