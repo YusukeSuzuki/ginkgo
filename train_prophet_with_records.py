@@ -299,7 +299,7 @@ def create_parser():
 
     sub_parser = sub_parsers.add_parser('test')
     sub_parser.set_defaults(func=do_test)
-    sub_parser.add_argument('--model', type=str)
+    sub_parser.add_argument('--input-model', type=str)
     sub_parser.add_argument('--prophet-yaml', type=str)
     sub_parser.add_argument('--modeldir', type=str)
     sub_parser.add_argument('--samples', type=str)
