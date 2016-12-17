@@ -20,7 +20,7 @@ ROOT_VARIABLE_SCOPE='prophet'
 MODEL_YAML_PATH = 'prophet_model.yaml'
 MODELS_DIR = 'models'
 
-MINI_BATCH_SIZE = 100
+MINI_BATCH_SIZE = 16
 
 # ------------------------------------------------------------
 # sub commands
@@ -68,7 +68,7 @@ def do_train(ns):
         with tf.variable_scope('input'):
             load_threads, input_batch, label_batch, weight_batch = \
                 shogi_loader.load_sfenx_threads_and_queue(
-                    coordinator, sess, path_list, MINI_BATCH_SIZE, threads_num=24)
+                    coordinator, sess, path_list, ns.minibatch_size, threads_num=24)
 
         tower_grads = []
 
@@ -161,7 +161,7 @@ def do_test(ns):
     with tf.variable_scope('input'), tf.device('/cpu:0'):
         load_threads, input_batch, label_batch, weight_batch = \
             shogi_loader.load_sfenx_threads_and_queue(
-                coordinator, sess, path_list, MINI_BATCH_SIZE,
+                coordinator, sess, path_list, ns.minibatch_size,
                 threads_num=24)
 
     # build model
@@ -232,9 +232,9 @@ def do_eval(ns):
 def do_dump_network(ns):
     # build
     with tf.variable_scope('input'), tf.device('/cpu:0'):
-        input_vector = tf.placeholder(tf.float32, [MINI_BATCH_SIZE,9,9,360])
-        label_vector = tf.placeholder(tf.float32, [MINI_BATCH_SIZE,2])
-        weight_vector = tf.placeholder(tf.float32, [MINI_BATCH_SIZE,1])
+        input_vector = tf.placeholder(tf.float32, [ns.minibatch_site,9,9,360])
+        label_vector = tf.placeholder(tf.float32, [ns.minibatch_site,2])
+        weight_vector = tf.placeholder(tf.float32, [ns.minibatch_site,1])
 
     with tf.variable_scope(ROOT_VARIABLE_SCOPE):
         graph_root = yl.load(ns.prophet_yaml)
@@ -257,9 +257,9 @@ def do_dump_graph_log(ns):
     #print('exclude tags: {}'.format(ns.exclude_tags.split(',')))
 
     with tf.variable_scope('input'), tf.device('/cpu:0'):
-        input_vector = tf.placeholder(tf.float32, [MINI_BATCH_SIZE,9,9,360])
-        label_vector = tf.placeholder(tf.float32, [MINI_BATCH_SIZE,2])
-        weight_vector = tf.placeholder(tf.float32, [MINI_BATCH_SIZE,1])
+        input_vector = tf.placeholder(tf.float32, [ns.minibatch_site,9,9,360])
+        label_vector = tf.placeholder(tf.float32, [ns.minibatch_site,2])
+        weight_vector = tf.placeholder(tf.float32, [ns.minibatch_site,1])
 
 
     with tf.variable_scope(ROOT_VARIABLE_SCOPE):
@@ -281,6 +281,7 @@ def create_parser():
     parser = AP(prog='train_prophet_with_records')
     parser.set_defaults(func=None)
     parser.add_argument('--logdir', type=str, default='./logs')
+    parser.add_argument('--growth-memory', type=bool, default=False)
     #parser.add_argument('--modelfile', type=str, default='model.ckpt')
     #parser.add_argument('--restore', type=str, default='')
 
@@ -293,6 +294,7 @@ def create_parser():
     sub_parser.add_argument('--prophet-yaml', type=str)
     sub_parser.add_argument('--modeldir', type=str)
     sub_parser.add_argument('--samples', type=str)
+    sub_parser.add_argument('--minibatch-num', type=int, default=MINI_BATCH_SIZE)
     sub_parser.add_argument('--num-gpus', type=int, default=1)
 
     sub_parser = sub_parsers.add_parser('test')
