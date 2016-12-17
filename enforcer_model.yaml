@@ -1,0 +1,106 @@
+---
+# user data tree
+user_variables:
+  - op_device: &op_device '/cpu:0'
+# graph data tree
+# input: [-1,9,9,360]
+root: !root
+  nodes_required: ['root']
+  nodes:
+    - !with
+      variable_scope: conv1
+      nodes:
+      - !conv2d
+        { nid: c1_o, source: root, width: 9, height: 9, kernels_num: 600, b_init: 1e-7 }
+      - !batch_normalization { nid: c1_n, x: c1_o }
+      - !relu { nid: c1, features: c1_n }
+    - !with
+      variable_scope: conv2
+      nodes:
+      - !conv2d
+        { nid: c2_o, source: c1, width: 7, height: 7, kernels_num: 900, b_init: 1e-7 }
+      - !batch_normalization { nid: c2_n, x: c2_o }
+      - !relu { nid: c2, features: c2_n }
+    - !with
+      variable_scope: conv3
+      nodes:
+      - !conv2d
+        { nid: c3_o, source: c2, width: 5, height: 5, kernels_num: 1200, b_init: 1e-7 }
+      - !batch_normalization { nid: c3_n, x: c3_o }
+      - !relu { nid: c3, features: c3_n }
+    - !with
+      variable_scope: conv4
+      nodes:
+      - !conv2d
+        { nid: c4_o, source: c3, width: 3, height: 3, kernels_num: 1600, b_init: 1e-7 }
+      - !batch_normalization { nid: c4_n, x: c4_o }
+      - !relu { nid: c4, features: c4_n }
+    - !with
+      variable_scope: conv5
+      nodes:
+      - !conv2d
+        { nid: c5_o, source: c4, width: 3, height: 3, kernels_num: 1600, b_init: 1e-7 }
+      - !batch_normalization { nid: c5_n, x: c5_o }
+      - !relu { nid: c5, features: c5_n }
+    - !with
+      variable_scope: maxpool2
+      nodes:
+      - !max_pool_2x2
+        {nid: mp2, source: c5 , ksize: [1,3,3,1], strides: [1,3,3,1]}
+    - !with
+      variable_scope: conv6
+      nodes:
+      - !conv2d
+        { nid: c6_o, source: mp2, width: 3, height: 3, kernels_num: 1600, b_init: 1e-7 }
+      - !batch_normalization { nid: c6_n, x: c6_o }
+      - !relu { nid: c6, features: c6_n }
+    - !with
+      variable_scope: conv7
+      nodes:
+      - !conv2d
+        { nid: c7_o, source: c6, width: 3, height: 3, kernels_num: 1200, b_init: 1e-7 }
+      - !batch_normalization { nid: c7_n, x: c7_o }
+      - !relu { nid: c7, features: c7_n }
+    - !with
+      variable_scope: conv8
+      nodes:
+      - !conv2d
+        { nid: c8_o, source: c7, width: 3, height: 3, kernels_num: 900, b_init: 1e-7 }
+      - !batch_normalization { nid: c8_n, x: c8_o }
+      - !relu { nid: c8, features: c8_n }
+    - !with
+      variable_scope: linear1
+      nodes:
+      - !linear
+        { nid: l1_o, name: l1, source: c8, b_init: 1e-15, length: 600}
+      - !batch_normalization { nid: l1_n, x: l1_o }
+      - !relu { nid: l1_f, features: l1_n }
+      - !dropout
+        { nid: l1, x: l1_f, keep_prob: 0.5 }
+    - !with
+      variable_scope: linear2
+      nodes:
+      - !linear
+        # 9x9x(73+34) = 8667
+        # krrRRbbBBggggssssSSSSnnnnNNNNllllLLLLppppppppppppppppppPPPPPPPPPPPPPPPPPP
+        # 12 2 2 2 4   4   4   4   4   4   4   18                18
+        # 02 0 2 0 0   4   0   4   0   4   0   18                0
+        { nid: l2, name: l2, source: l1, b_init: 1e-15, length: 8667}
+      - !softmax { nid: out, name: out, logit: l2 }
+    - !with
+      variable_scope: train
+      tags: [train]
+      nodes:
+      - !prophet_loss
+          { nid: p_loss, tag: train,
+            source1: out, source2: label, source3: turn_weight }
+      - !correct_rate {tag: train, nid: rate, x1: label, x2: out }
+    - !with
+      variable_scope: log
+      tags: [train, log]
+      nodes:
+      - !reduce_mean
+        {nid: loss_mean, source: p_loss, dims: [1]}
+      - !scalar_summary
+        {summary_tag: 'loss', source: loss_mean}
+
