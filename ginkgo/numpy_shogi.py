@@ -63,6 +63,26 @@ def create_position_channels():
 
 PositionChannles = create_position_channels()
 
+def create_movement_channels():
+    index = 0
+    result = {}
+
+    for color in [0,1]:
+        for type_i, counts in enumerate(TypeCounts):
+            for n in range(counts):
+                for i in range(1,TypeSkips[type_i]):
+                    result[index+i] = (type_i, color)
+
+                index += TypeSkips[type_i]
+
+    return result
+
+MovementChannels = create_movement_channels()
+
+# ------------------------------------------------------------
+# sfen -> vec
+# ------------------------------------------------------------
+
 def skipped_board(board):
     sfen = board.sfen()
     splitted = sfen.split(' ')
@@ -257,6 +277,28 @@ def player_inverse(vec):
 
     return res2
 
+# ------------------------------------------------------------
+# vec -> move vec
+# ------------------------------------------------------------
+
+def extract_movement_vec(vec, color=0):
+    move_vec = np.zeros([1,9,9,107])
+
+    n = 0
+
+    for i in range(0,180) if color == 0 else range(180,360):
+        if i not in MovementChannels:
+            continue
+        move_vec[0,:,:,n] = vec[0,:,:,i]
+        n += 1
+        #print(MovementChannels[i])
+
+    return np.maximum(move_vec,0)
+
+# ------------------------------------------------------------
+# easy testing
+# ------------------------------------------------------------
+
 from random import choice
 
 if __name__ == '__main__':
@@ -280,9 +322,16 @@ if __name__ == '__main__':
         print(board)
         print(vec)
 
-    if True:
+    if False:
         import collections
         temp = collections.OrderedDict(sorted(PositionChannles.items()))
         for k, v in temp.items():
             print(k,v)
+
+    if True:
+        #print(MovementChannels)
+        print(MovementChannels)
+        vec = sfen_to_vector(board.sfen())
+
+        print(to_debug(extract_movement_vec(vec)))
 

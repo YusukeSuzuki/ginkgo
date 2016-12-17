@@ -29,7 +29,6 @@ class NumpyShogiTest(ut.TestCase):
 
     def test_inverse_conversion2(self):
         for i in range(5):
-            print('test: ', i)
             b1 = shogi.Board()
             n = 0
 
@@ -84,6 +83,27 @@ class NumpyShogiTest(ut.TestCase):
                     'check counter moves: {}\n{}\n{}'.format(n, b1_moves[1], moves[1]))
                 b1.push( choice(list(b1.legal_moves)) )
                 n += 1
+
+    def test_extract_movement_vec(self):
+        self_move_indices = sorted([key for key,val in ns.MovementChannels.items() if val[1] == 0])
+
+        for i in range(5):
+            b1 = shogi.Board()
+            n = 0
+            for n in range(300):
+                if b1.is_checkmate(): break
+
+                vec = ns.sfen_to_vector(b1.sfen())
+                move_vec = ns.extract_movement_vec(vec)
+
+                move_i = 0
+
+                for key in self_move_indices:
+                    self.assertTrue( np.array_equal(
+                        np.maximum(vec[0,:,:,key],0)
+                        ,move_vec[0,:,:,move_i]))
+
+                    move_i += 1
 
 if __name__ == '__main__':
     ut.main()
