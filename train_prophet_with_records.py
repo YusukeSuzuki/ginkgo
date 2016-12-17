@@ -232,9 +232,9 @@ def do_eval(ns):
 def do_dump_network(ns):
     # build
     with tf.variable_scope('input'), tf.device('/cpu:0'):
-        input_vector = tf.placeholder(tf.float32, [ns.minibatch_site,9,9,360])
-        label_vector = tf.placeholder(tf.float32, [ns.minibatch_site,2])
-        weight_vector = tf.placeholder(tf.float32, [ns.minibatch_site,1])
+        input_vector = tf.placeholder(tf.float32, [ns.minibatch_size,9,9,360])
+        label_vector = tf.placeholder(tf.float32, [ns.minibatch_size,2])
+        weight_vector = tf.placeholder(tf.float32, [ns.minibatch_size,1])
 
     with tf.variable_scope(ROOT_VARIABLE_SCOPE):
         graph_root = yl.load(ns.prophet_yaml)
@@ -257,9 +257,9 @@ def do_dump_graph_log(ns):
     #print('exclude tags: {}'.format(ns.exclude_tags.split(',')))
 
     with tf.variable_scope('input'), tf.device('/cpu:0'):
-        input_vector = tf.placeholder(tf.float32, [ns.minibatch_site,9,9,360])
-        label_vector = tf.placeholder(tf.float32, [ns.minibatch_site,2])
-        weight_vector = tf.placeholder(tf.float32, [ns.minibatch_site,1])
+        input_vector = tf.placeholder(tf.float32, [ns.minibatch_size,9,9,360])
+        label_vector = tf.placeholder(tf.float32, [ns.minibatch_size,2])
+        weight_vector = tf.placeholder(tf.float32, [ns.minibatch_size,1])
 
 
     with tf.variable_scope(ROOT_VARIABLE_SCOPE):
@@ -294,7 +294,7 @@ def create_parser():
     sub_parser.add_argument('--prophet-yaml', type=str)
     sub_parser.add_argument('--modeldir', type=str)
     sub_parser.add_argument('--samples', type=str)
-    sub_parser.add_argument('--minibatch-num', type=int, default=MINI_BATCH_SIZE)
+    sub_parser.add_argument('--minibatch-size', type=int, default=MINI_BATCH_SIZE)
     sub_parser.add_argument('--num-gpus', type=int, default=1)
 
     sub_parser = sub_parsers.add_parser('test')
