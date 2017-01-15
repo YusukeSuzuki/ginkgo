@@ -724,7 +724,8 @@ class ScalarSummary(yaml.YAMLObject, Node):
         source_node = nids[self.source]
 
         return nids, self.nid, tf.summary.scalar(
-            self.summary_tag+'/'+source_node.device, source_node, name=self.name)
+            self.summary_tag+'/'+source_node.device, source_node)
+            #self.summary_tag+'/'+source_node.device, source_node, name=self.name)
 
 class ImageSummary(yaml.YAMLObject, Node):
     yaml_tag = u'!image_summary'
