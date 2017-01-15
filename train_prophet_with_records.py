@@ -92,16 +92,16 @@ def do_train(ns):
         apply_gradient_op = opt.apply_gradients(grads, global_step=global_step)
 
         for var in tf.trainable_variables():
-            summaries.append(tf.histogram_summary(var.op.name, var))
+            summaries.append(tf.summary.histogram(var.op.name, var))
 
         train_op = apply_gradient_op
 
         saver = tf.train.Saver()
-        merged = tf.merge_all_summaries()
+        merged = tf.summary.merge_all()
 
         print('initialize')
-        writer = tf.train.SummaryWriter(ns.logdir, sess.graph)
-        sess.run(tf.initialize_all_variables())
+        writer = tf.summary.FileWriter(ns.logdir, sess.graph)
+        sess.run(tf.global_variables_initializer())
 
         if ns.input_model:
             print('restore {}'.format(ns.input_model))

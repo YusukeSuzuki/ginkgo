@@ -110,7 +110,7 @@ def load_sfenx_threads_and_queue(
 
     input_batch, label_batch, turn_weight_batch = q.dequeue_many(batch_size)
 
-    tf.scalar_summary('shogi_loader/size', q.size())
+    tf.summary.scalar('shogi_loader/size', q.size())
 
     return threads, input_batch, label_batch, turn_weight_batch
 
