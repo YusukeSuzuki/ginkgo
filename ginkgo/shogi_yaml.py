@@ -31,7 +31,7 @@ class ProphetLoss(yaml.YAMLObject, yl.Node):
 
         with tf.variable_scope(self.variable_scope) \
                 if self.variable_scope else yl.WithNone():
-            loss = tf.reduce_mean( -tf.reduce_sum( source_node2 * tf.log(source_node1), reduction_indices=[1] ) ) * source_node3
+            loss = tf.reduce_mean( -tf.reduce_sum( source_node2 * tf.log(source_node1+1e-6), reduction_indices=[1] ) ) * source_node3
             return nids, self.nid, loss
 
 class CorrectRate(yaml.YAMLObject, yl.Node):
