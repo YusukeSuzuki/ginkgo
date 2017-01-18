@@ -88,7 +88,9 @@ def do_train(ns):
                     tower_grads.append(grads)
 
         grads = average_gradients(tower_grads)
-        summaries.append(tf.summary.histogram('average_gradients', grads))
+
+        for i, grad in grads.items():
+            summaries.append(tf.summary.histogram('average_gradient_{}'.format(i), grad))
 
         apply_gradient_op = opt.apply_gradients(grads, global_step=global_step)
 
