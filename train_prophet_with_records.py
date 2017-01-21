@@ -63,7 +63,7 @@ def do_train(ns):
             'global_step', [],
             initializer=tf.constant_initializer(0), trainable=False)
 
-        opt = tf.train.AdamOptimizer(ns.leearning_rate)
+        opt = tf.train.AdamOptimizer(ns.learning_rate)
 
         # build read data threads
         with tf.variable_scope('input'):
