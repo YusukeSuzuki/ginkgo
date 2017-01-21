@@ -21,6 +21,7 @@ MODEL_YAML_PATH = 'prophet_model.yaml'
 MODELS_DIR = 'models'
 
 MINI_BATCH_SIZE = 16
+DEFAULT_LEARNING_RATE = 1e-4
 
 # ------------------------------------------------------------
 # sub commands
@@ -62,7 +63,7 @@ def do_train(ns):
             'global_step', [],
             initializer=tf.constant_initializer(0), trainable=False)
 
-        opt = tf.train.AdamOptimizer(1e-4)
+        opt = tf.train.AdamOptimizer(ns.leearning_rate)
 
         # build read data threads
         with tf.variable_scope('input'):
@@ -298,6 +299,7 @@ def create_parser():
     sub_parser.add_argument('--modeldir', type=str)
     sub_parser.add_argument('--samples', type=str)
     sub_parser.add_argument('--minibatch-size', type=int, default=MINI_BATCH_SIZE)
+    sub_parser.add_argument('--learning-rate', type=float, default=DEFAULT_LEARNING_RATE)
     sub_parser.add_argument('--num-gpus', type=int, default=1)
 
     sub_parser = sub_parsers.add_parser('test')
