@@ -37,7 +37,9 @@ def average_gradients(tower_grads, log_gradients):
         for g, u in grad_and_vars:
             expanded_g = tf.expand_dims(g,0)
             grads.append(expanded_g)
-            summaries.append(tf.summary.histogram('log_grad{}'.format(u.name), g))
+
+            if log_gradients:
+                summaries.append(tf.summary.histogram('log_grad/{}'.format(u.name), g))
 
         grad = tf.concat(0,grads)
         grad = tf.reduce_mean(grad,0)
