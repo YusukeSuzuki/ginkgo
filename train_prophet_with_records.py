@@ -27,14 +27,17 @@ DEFAULT_LEARNING_RATE = 1e-4
 # sub commands
 # ------------------------------------------------------------
 
-def average_gradients(tower_grads):
+def average_gradients(tower_grads, log_gradients):
     average_grads = []
+    summaries = []
+
     for grad_and_vars in zip(*tower_grads):
         grads = []
-        
+
         for g, u in grad_and_vars:
             expanded_g = tf.expand_dims(g,0)
             grads.append(expanded_g)
+            summaries.append(tf.summary.histogram('log_grad{}'.format(u.name), g))
 
         grad = tf.concat(0,grads)
         grad = tf.reduce_mean(grad,0)
@@ -43,7 +46,7 @@ def average_gradients(tower_grads):
         grad_and_var = (grad, v)
         average_grads.append(grad_and_var)
 
-    return average_grads
+    return average_grads, summaries
 
 def do_train(ns):
     models_dir = Path(ns.modeldir)
@@ -88,15 +91,13 @@ def do_train(ns):
                     grads = opt.compute_gradients(loss)
                     tower_grads.append(grads)
 
-        grads = average_gradients(tower_grads)
-
-        for i, grad in enumerate(grads):
-            summaries.append(tf.summary.histogram('average_gradient_{}'.format(i), grad))
+        grads, grads_summaries = average_gradients(tower_grads, ns.log_gradients)
 
         apply_gradient_op = opt.apply_gradients(grads, global_step=global_step)
 
-        for var in tf.trainable_variables():
-            summaries.append(tf.summary.histogram(var.op.name, var))
+        if ns.log_variables:
+            for var in tf.trainable_variables():
+                summaries.append(tf.summary.histogram(var.op.name, var))
 
         train_op = apply_gradient_op
 
@@ -286,8 +287,6 @@ def create_parser():
     parser.set_defaults(func=None)
     parser.add_argument('--logdir', type=str, default='./logs')
     parser.add_argument('--growth-memory', type=bool, default=False)
-    #parser.add_argument('--modelfile', type=str, default='model.ckpt')
-    #parser.add_argument('--restore', type=str, default='')
 
     sub_parsers = parser.add_subparsers()
 
@@ -300,6 +299,8 @@ def create_parser():
     sub_parser.add_argument('--samples', type=str)
     sub_parser.add_argument('--minibatch-size', type=int, default=MINI_BATCH_SIZE)
     sub_parser.add_argument('--learning-rate', type=float, default=DEFAULT_LEARNING_RATE)
+    sub_parser.add_argument('--log-gradients', type=bool, default=False)
+    sub_parser.add_argument('--log-variables', type=bool, default=False)
     sub_parser.add_argument('--num-gpus', type=int, default=1)
 
     sub_parser = sub_parsers.add_parser('test')
