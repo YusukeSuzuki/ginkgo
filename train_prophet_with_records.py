@@ -21,7 +21,7 @@ MODEL_YAML_PATH = 'prophet_model.yaml'
 MODELS_DIR = 'models'
 
 MINI_BATCH_SIZE = 16
-DEFAULT_LEARNING_RATE = 1e-4
+DEFAULT_LEARNING_RATE = 1e-5
 
 # ------------------------------------------------------------
 # sub commands
@@ -50,6 +50,18 @@ def average_gradients(tower_grads, log_gradients):
 
     return average_grads, summaries
 
+def average_gradients_gpu(tower_grad):
+    average_grads = []
+
+    for grad_and_vars in tower_grad:
+        grads = []
+
+        expanded_g = tf.expand_dims(grad_and_vars[0],0)
+        grad = tf.reduce_mean(expanded_g,0)
+        average_grads.append( (grad, grad_and_vars[1]) )
+
+    return average_grads
+
 def do_train(ns):
     models_dir = Path(ns.modeldir)
     model_path = models_dir/ns.output_model
@@ -74,7 +86,8 @@ def do_train(ns):
         with tf.variable_scope('input'):
             load_threads, input_batch, label_batch, weight_batch = \
                 shogi_loader.load_sfenx_threads_and_queue(
-                    coordinator, sess, path_list, ns.minibatch_size, threads_num=24)
+                    coordinator, sess, path_list, ns.minibatch_size,
+                    threads_num=24, queue_max=100000, queue_min=16000)
 
         tower_grads = []
 
@@ -91,7 +104,7 @@ def do_train(ns):
 
                     summaries = tf.get_collection(tf.GraphKeys.SUMMARIES, scope)
                     grads = opt.compute_gradients(loss)
-                    tower_grads.append(grads)
+                    tower_grads.append( average_gradients_gpu(grads) )
 
         grads, grads_summaries = average_gradients(tower_grads, ns.log_gradients)
 
