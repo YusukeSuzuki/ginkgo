@@ -1,0 +1,35 @@
+settings:
+  home: $HOME
+  working_directory: .
+  output_directory: outs
+batches:
+  - name: phase1
+    commands:
+      - command: echo
+        args:
+          - this
+          - is
+          - a
+          - pen
+  - name: phase2
+    commands:
+      - command: echo
+        args:
+          - pen
+          - pineapple
+          - apple
+          - pen
+  - name: phase3
+    commands:
+      - command: cat
+        args:
+          - .
+  - name: phase4
+    commands:
+      - command: echo
+        args:
+          - do
+          - it
+          - your
+          - self
+
