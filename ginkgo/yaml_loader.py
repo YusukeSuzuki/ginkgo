@@ -7,31 +7,43 @@ import math
 # utilities
 # ------------------------------------------------------------
 
+_variable_device = None
+
+class WithNone:
+    def __enter__(self): pass
+    def __exit__(self,t,v,tb): pass
+
 def weight_variable(shape, dev=0.35, name=None):
     """create weight variable for conv2d(weight sharing)"""
 
-    return tf.get_variable(name, shape,
-        #initializer=tf.truncated_normal_initializer(stddev=dev))
-        initializer=tf.random_uniform_initializer(minval=-0.1, maxval=0.1))
+    global _variable_device
+    print(_variable_device)
+
+    with WithNone() if _variable_device is None else tf.device(_variable_device):
+        return tf.get_variable(name, shape,
+            #initializer=tf.truncated_normal_initializer(stddev=dev))
+            initializer=tf.random_uniform_initializer(minval=-0.1, maxval=0.1))
 
 def conv_weight_variable(shape, dev=0.35, name=None):
     """create weight variable for conv2d(weight sharing)"""
     w = 1e-2
 
-    return tf.get_variable(name, shape,
-        initializer=tf.random_uniform_initializer(minval=0, maxval=w))
+    global _variable_device
+
+    with WithNone() if _variable_device is None else tf.device(_variable_device):
+        return tf.get_variable(name, shape,
+            initializer=tf.random_uniform_initializer(minval=0, maxval=w))
 
 def bias_variable(shape, val=0.1, name=None):
     """create bias variable for conv2d(weight sharing)"""
 
-#    return tf.get_variable(
-#        name, shape, initializer=tf.constant_initializer(val))
-    return tf.get_variable(name, shape,
-        initializer=tf.random_uniform_initializer(minval=-val, maxval=val))
+    global _variable_device
 
-class WithNone:
-    def __enter__(self): pass
-    def __exit__(self,t,v,tb): pass
+    with WithNone() if _variable_device is None else tf.device(_variable_device):
+#       return tf.get_variable(
+#           name, shape, initializer=tf.constant_initializer(val))
+        return tf.get_variable(name, shape,
+            initializer=tf.random_uniform_initializer(minval=-val, maxval=val))
 
 StrDTypeMap = {
     'tf.float32': tf.float32,
@@ -117,9 +129,13 @@ class Node:
 class Root(yaml.YAMLObject):
     yaml_tag = u'!root'
 
-    def __init__(self, nodes, nodes_required):
+    def __init__(self, nodes, nodes_required, variable_device):
         self.nodes = nodes
         self.nodes_required = nodes_required
+        self.variable_device = variable_device
+
+        global _variable_device
+        _variable_device = variable_device
 
     def __repr__(self):
         return 'Root'
@@ -131,6 +147,7 @@ class Root(yaml.YAMLObject):
         args = {
             'nodes': yaml_dict.get('nodes', None),
             'nodes_required': yaml_dict.get('nodes_required', None),
+            'variable_device': yaml_dict.get('variable_device', None),
         }
 
         assert type(args['nodes']) is list, \
