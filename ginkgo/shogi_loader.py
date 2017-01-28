@@ -4,6 +4,7 @@ import ginkgo.shogi_records as sr
 import tensorflow as tf
 import numpy as np
 
+import threading
 from threading import Thread
 import queue
 from queue import Queue
@@ -108,9 +109,9 @@ def load_sfenx_threads_and_queue(
             input_vector_ph, label_ph, turn_weight_ph))
         for i in range(threads_num)]
 
-    input_batch, label_batch, turn_weight_batch = q.dequeue_many(batch_size)
-
     tf.summary.scalar('shogi_loader/size', q.size())
 
-    return threads, input_batch, label_batch, turn_weight_batch
+#    input_batch, label_batch, turn_weight_batch = q.dequeue_many(batch_size)
+#    return threads, input_batch, label_batch, turn_weight_batch
+    return threads, q
 

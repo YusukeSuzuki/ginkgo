@@ -7,7 +7,7 @@ def load_file(path):
     lines = list(map(lambda x: x.rstrip(), lines))
     lines = filter(lambda x: len(x) > 0, lines)
 
-    return lines
+    return list(lines)
 
 def load_files(path):
     d = Path(path)

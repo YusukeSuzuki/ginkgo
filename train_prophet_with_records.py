@@ -69,11 +69,13 @@ def do_train(ns):
 
     # build read data threads
     path_list = list(Path(ns.samples).glob('*.csa'))
+    print('len(path_list) = ', len(path_list))
     shuffle(path_list)
 
     with tf.Graph().as_default(), tf.device('/cpu:0'):
         sess = tf.Session( config=tf.ConfigProto(
             allow_soft_placement=True, log_device_placement=False))
+
         coordinator = tf.train.Coordinator()
 
         global_step = tf.get_variable(
@@ -84,14 +86,16 @@ def do_train(ns):
 
         # build read data threads
         with tf.variable_scope('input'):
-            load_threads, input_batch, label_batch, weight_batch = \
+            load_threads, input_queue = \
                 shogi_loader.load_sfenx_threads_and_queue(
                     coordinator, sess, path_list, ns.minibatch_size,
-                    threads_num=24, queue_max=100000, queue_min=16000)
+                    threads_num=12, queue_max=100000, queue_min=16000)
 
         tower_grads = []
 
         for i in range(ns.num_gpus):
+            input_batch, label_batch, weight_batch = input_queue.dequeue_many(ns.minibatch_size)
+
             with tf.device('/gpu:{}'.format(i)):
                 with tf.name_scope('tower_{}'.format(i)) as scope:
                     graph_root = yl.load(ns.prophet_yaml)
