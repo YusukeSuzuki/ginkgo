@@ -84,10 +84,10 @@ def run_batches(config, verbose):
             print("run command line: {}".format(" ".join(command_line)))
 
             try:
-                proc = Popen(command_line, stdout=PIPE, stderr=PIPE)
+                proc = Popen(command_line, bufsize=1, universal_newlines=True, stdout=PIPE, stderr=PIPE)
 
-                tee_out_proc = Popen(['tee', '-a', 'stdout.txt'], stdin=proc.stdout)
-                tee_err_proc = Popen(['tee', '-a', 'stderr.txt'], stdin=proc.stderr)
+                tee_out_proc = Popen(['tee', '-a', 'stdout.txt'], bufsize=1, universal_newlines=True, stdin=proc.stdout)
+                tee_err_proc = Popen(['tee', '-a', 'stderr.txt'], bufsize=1, universal_newlines=True, stdin=proc.stderr)
 
                 tee_out_proc.wait()
                 tee_err_proc.wait()
