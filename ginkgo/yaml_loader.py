@@ -306,6 +306,97 @@ class Conv2d(yaml.YAMLObject, Node):
                     source_node, w, strides=self.strides, padding=self.padding), b, name=self.name)
         return nids, self.nid, out
 
+class DepthwiseConv2d(yaml.YAMLObject, Node):
+    yaml_tag = u'!depthwise_conv2d'
+
+    def __init__(self, loader, node):
+        params = {
+            'nid': (str, None, []),
+            'tags': (nop, [], [is_typeof(list)]),
+            'source': (nop, None, [is_exist]),
+            'width': (int, 0, [is_greater_than(0)]),
+            'height': (int, 0, [is_greater_than(0)]),
+            'channel_multiplier': (int, 0, [is_greater_than(0)]),
+            'strides': (nop, [1,1,1,1], [is_typeof(list)]),
+            'padding': (str, 'SAME', []),
+            'b_init': (float, 1e-2, []),
+            'with_bias': (bool, False, []),
+            'name': (str, None, []),
+            'variable_scope': (str, None, [])
+            }
+        self.parse(loader, node, params)
+
+    def __repr__(self):
+        return 'DepthwithConv2d'
+
+    @classmethod
+    def from_yaml(cls, loader, node):
+        return cls(loader, node)
+
+    def create_node(self, nids, exclude_tags):
+        source_node = nids[self.source]
+        channels = source_node.get_shape().as_list()[3]
+
+        with tf.variable_scope(self.variable_scope) if self.variable_scope else WithNone():
+            w = conv_weight_variable(
+                [self.height, self.width, channels, self.channel_multiplier], dev=1.0e-3, name="weight")
+
+            if not self.with_bias:
+                out = tf.nn.depthwise_conv2d(
+                    source_node, w, strides=self.strides, padding=self.padding, name=self.name)
+            else:
+                b = bias_variable([channels*self.channel_multiplier], val=self.b_init, name="bias")
+                out = tf.add( tf.nn.depthwise_conv2d(
+                    source_node, w, strides=self.strides, padding=self.padding), b, name=self.name)
+        return nids, self.nid, out
+
+class SeparableConv2d(yaml.YAMLObject, Node):
+    yaml_tag = u'!separable_conv2d'
+
+    def __init__(self, loader, node):
+        params = {
+            'nid': (str, None, []),
+            'tags': (nop, [], [is_typeof(list)]),
+            'source': (nop, None, [is_exist]),
+            'width': (int, 0, [is_greater_than(0)]),
+            'height': (int, 0, [is_greater_than(0)]),
+            'channel_multiplier': (int, 0, [is_greater_than(0)]),
+            'out_channels': (int, 0, [is_greater_than(0)]),
+            'strides': (nop, [1,1,1,1], [is_typeof(list)]),
+            'b_init': (float, 1e-2, []),
+            'with_bias': (bool, False, []),
+            'padding': (str, 'SAME', []),
+            'name': (str, None, []),
+            'variable_scope': (str, None, [])
+            }
+        self.parse(loader, node, params)
+
+    def __repr__(self):
+        return 'SeparableConv2d'
+
+    @classmethod
+    def from_yaml(cls, loader, node):
+        return cls(loader, node)
+
+    def create_node(self, nids, exclude_tags):
+        source_node = nids[self.source]
+        channels = source_node.get_shape().as_list()[3]
+
+        with tf.variable_scope(self.variable_scope) if self.variable_scope else WithNone():
+            w1 = conv_weight_variable(
+                [self.height, self.width, channels, self.channel_multiplier], dev=1.0e-3, name="weight")
+            w2 = conv_weight_variable(
+                [1, 1, channels * self.channel_multiplier, self.out_channels], dev=1.0e-3, name="weight")
+
+            if not self.with_bias:
+                out = tf.nn.separable_conv2d(
+                    source_node, w1, w2, strides=self.strides, padding=self.padding, name=self.name)
+            else:
+                b = bias_variable([self.out_channels], val=self.b_init, name="bias")
+                out = tf.add( tf.nn.conv2d(
+                    source_node, w, strides=self.strides, padding=self.padding), b, name=self.name)
+        return nids, self.nid, out
+
 class Conv2dTranspose(yaml.YAMLObject, Node):
     yaml_tag = u'!conv2d_transpose'
 

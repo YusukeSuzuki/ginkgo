@@ -1,4 +1,8 @@
 ---
+# used until 2017-1-29
+# initial idea
+# no bias
+
 # user data tree
 user_variables:
   - op_device: &op_device '/cpu:0'
