@@ -232,6 +232,7 @@ class Linear(yaml.YAMLObject, Node):
             'source': (nop, None, [is_exist]),
             'length': (int, 0, [is_greater_than(0)]),
             'b_init': (float, 0.1, []),
+            'with_bias': (bool, False, []),
             'name': (str, None, []),
             'variable_scope': (str, None, [])
             }
@@ -253,16 +254,13 @@ class Linear(yaml.YAMLObject, Node):
         with tf.variable_scope(self.variable_scope) if self.variable_scope else WithNone():
             w = weight_variable(
                 [source_length,self.length], dev=1.0e-3, name="weight")
-            #b = bias_variable([self.length], val=self.b_init, name="bias")
-            mul = tf.matmul(source_node, w)
+            if not self.with_bias:
+                out = tf.matmul(source_node, w)
+            else:
+                b = bias_variable([self.length], val=self.b_init, name="bias")
+                out = tf.matmul(source_node, w) + b
 
-        return nids, self.nid, mul
-#            w = weight_variable(
-#                [source_length,self.length], dev=1.0e-3, name="weight")
-#            b = bias_variable([self.length], val=self.b_init, name="bias")
-#            mul = tf.matmul(source_node, w)
-#
-#        return nids, self.nid, mul + b
+        return nids, self.nid, out 
 
 class Conv2d(yaml.YAMLObject, Node):
     yaml_tag = u'!conv2d'
@@ -276,7 +274,8 @@ class Conv2d(yaml.YAMLObject, Node):
             'height': (int, 0, [is_greater_than(0)]),
             'kernels_num': (int, 0, [is_greater_than(0)]),
             'strides': (nop, [1,1,1,1], [is_typeof(list)]),
-            'b_init': (float, 0.1, []),
+            'b_init': (float, 1e-2, []),
+            'with_bias': (bool, False, []),
             'padding': (str, 'SAME', []),
             'name': (str, None, []),
             'variable_scope': (str, None, [])
@@ -297,17 +296,15 @@ class Conv2d(yaml.YAMLObject, Node):
         with tf.variable_scope(self.variable_scope) if self.variable_scope else WithNone():
             w = conv_weight_variable(
                 [self.height, self.width, channels,self.kernels_num], dev=1.0e-3, name="weight")
-            out = tf.nn.conv2d(
-                source_node, w, strides=self.strides, padding=self.padding, name=self.name)
 
+            if not self.with_bias:
+                out = tf.nn.conv2d(
+                    source_node, w, strides=self.strides, padding=self.padding, name=self.name)
+            else:
+                b = bias_variable([self.kernels_num], val=self.b_init, name="bias")
+                out = tf.add( tf.nn.conv2d(
+                    source_node, w, strides=self.strides, padding=self.padding), b, name=self.name)
         return nids, self.nid, out
-#            w = conv_weight_variable(
-#                [self.height, self.width, channels,self.kernels_num], dev=1.0e-3, name="weight")
-#            b = bias_variable([self.kernels_num], val=self.b_init, name="bias")
-#            out = tf.add( tf.nn.conv2d(
-#                source_node, w, strides=self.strides, padding=self.padding), b, name=self.name)
-#
-#        return nids, self.nid, out
 
 class Conv2dTranspose(yaml.YAMLObject, Node):
     yaml_tag = u'!conv2d_transpose'
