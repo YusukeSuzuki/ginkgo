@@ -129,7 +129,7 @@ def do_train(ns):
 
         if ns.input_model:
             print('restore {}'.format(ns.input_model))
-            input_model = ns.modeldir+'/'+ns.input_model
+            input_model = ns.input_model
             saver.restore(sess, input_model)
 
         writer.add_graph(tf.get_default_graph())
@@ -212,7 +212,7 @@ def do_test(ns):
 
     if ns.input_model:
         print('restore {}'.format(ns.input_model))
-        input_model = ns.modeldir+'/'+ns.input_model
+        input_model = ns.input_model
         saver.restore(sess, input_model)
 
     writer.add_graph(tf.get_default_graph())
