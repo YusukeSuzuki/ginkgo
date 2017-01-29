@@ -80,7 +80,13 @@ def run_batches(config, verbose):
         returncode = 0
 
         for command in batch['commands']:
-            command_line = [command['command']] + command['args']
+            args = []
+
+            for key, val in command.items():
+                if key.startswith('args'):
+                    args.extend(val)
+
+            command_line = [command['command']] + args
             print("run command line: {}".format(" ".join(command_line)))
 
             try:
