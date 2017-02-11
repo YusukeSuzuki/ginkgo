@@ -83,6 +83,7 @@ def do_train(ns):
             initializer=tf.constant_initializer(0), trainable=False)
 
         opt = tf.train.AdamOptimizer(ns.learning_rate)
+        #opt = tf.train.AdamOptimizer(ns.learning_rate, beta1=0.9, beta2=0.99995, epsilon=0.01)
 
         # build read data threads
         with tf.variable_scope('input'):
@@ -109,6 +110,7 @@ def do_train(ns):
                     summaries = tf.get_collection(tf.GraphKeys.SUMMARIES, scope)
                     grads = opt.compute_gradients(loss)
                     tower_grads.append( average_gradients_gpu(grads) )
+                    #tower_grads.append( grads )
 
         grads, grads_summaries = average_gradients(tower_grads, ns.log_gradients)
 
@@ -156,11 +158,11 @@ def do_train(ns):
                     print('save backup to: {}'.format(model_backup_path))
                     saver.save(sess, str(model_backup_path))
 
-                if gs < 100 and gs % 10:
+                if gs < 100 and gs % 2 == 0:
                     writer.flush()
-                if gs < 2000 and gs % 100:
+                if gs < 2000 and gs % 10 == 0:
                     writer.flush()
-                if gs < 5000 and gs % 200:
+                if gs < 5000 and gs % 50 == 0:
                     writer.flush()
         except tf.errors.OutOfRangeError as e:
             print('sample exausted')
