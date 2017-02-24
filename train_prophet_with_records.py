@@ -39,7 +39,7 @@ def average_gradients(tower_grads, log_gradients):
             grads.append(expanded_g)
 
             if log_gradients:
-                summaries.append(tf.summary.histogram('log_grad/{}'.format(u.name), g))
+                summaries.append(tf.summary.histogram('log_grad/{}'.format(u.name), g, collections='grads'))
 
         grad = tf.concat(0,grads)
         grad = tf.reduce_mean(grad,0)
@@ -82,15 +82,14 @@ def do_train(ns):
             'global_step', [],
             initializer=tf.constant_initializer(0), trainable=False)
 
-        opt = tf.train.AdamOptimizer(ns.learning_rate)
-        #opt = tf.train.AdamOptimizer(ns.learning_rate, beta1=0.9, beta2=0.99995, epsilon=0.01)
+        opt = tf.train.AdamOptimizer(ns.learning_rate, beta1=ns.adam_beta1, beta2=adam_beta2)
 
         # build read data threads
         with tf.variable_scope('input'):
             load_threads, input_queue = \
                 shogi_loader.load_sfenx_threads_and_queue(
                     coordinator, sess, path_list, ns.minibatch_size,
-                    threads_num=12, queue_max=100000, queue_min=16000)
+                    threads_num=6, queue_max=50000, queue_min=16000)
 
         tower_grads = []
 
@@ -101,16 +100,14 @@ def do_train(ns):
                 with tf.name_scope('tower_{}'.format(i)) as scope:
                     graph_root = yl.load(ns.prophet_yaml)
                     tags = graph_root.build(feed_dict={
-                        'root': input_batch, 'label': label_batch,
-                        'turn_weight': weight_batch})
+                        'root': input_batch, 'label': label_batch, 'turn_weight': weight_batch})
                     loss = tags['p_loss']
 
                     tf.get_variable_scope().reuse_variables()
 
                     summaries = tf.get_collection(tf.GraphKeys.SUMMARIES, scope)
                     grads = opt.compute_gradients(loss)
-                    tower_grads.append( average_gradients_gpu(grads) )
-                    #tower_grads.append( grads )
+                    tower_grads.append( grads )
 
         grads, grads_summaries = average_gradients(tower_grads, ns.log_gradients)
 
@@ -124,6 +121,7 @@ def do_train(ns):
 
         saver = tf.train.Saver()
         merged = tf.summary.merge_all()
+        grads_log_op = tf.summary.merge(grads_summaries)
 
         print('initialize')
         writer = tf.summary.FileWriter(ns.logdir, sess.graph)
@@ -144,11 +142,13 @@ def do_train(ns):
 
         try:
             while not coordinator.should_stop():
-                if gs % 5 == 0:
+                if gs % 100 == 1:
+                    summary, grads_log, _, gs = sess.run( (merged, grads_log_op, train_op, global_step), feed_dict={} )
+                    writer.add_summary(summary, gs)
+                    writer.add_summary(grads_log, gs)
+                else:
                     summary, res, gs = sess.run( (merged, train_op, global_step), feed_dict={} )
                     writer.add_summary(summary, gs)
-                else:
-                    res, gs = sess.run( (train_op, global_step), feed_dict={} )
 
                 gs = int(gs)
 
@@ -160,9 +160,9 @@ def do_train(ns):
 
                 if gs < 100 and gs % 2 == 0:
                     writer.flush()
-                if gs < 2000 and gs % 10 == 0:
+                if gs < 2000 and gs % 5 == 0:
                     writer.flush()
-                if gs < 5000 and gs % 50 == 0:
+                if gs < 5000 and gs % 10 == 0:
                     writer.flush()
         except tf.errors.OutOfRangeError as e:
             print('sample exausted')
@@ -320,6 +320,8 @@ def create_parser():
     sub_parser.add_argument('--samples', type=str)
     sub_parser.add_argument('--minibatch-size', type=int, default=MINI_BATCH_SIZE)
     sub_parser.add_argument('--learning-rate', type=float, default=DEFAULT_LEARNING_RATE)
+    sub_parser.add_argument('--adam-beta1', type=float, default=0.9)
+    sub_parser.add_argument('--adam-beta2', type=float, default=0.999)
     sub_parser.add_argument('--log-gradients', type=bool, default=False)
     sub_parser.add_argument('--log-variables', type=bool, default=False)
     sub_parser.add_argument('--num-gpus', type=int, default=1)
