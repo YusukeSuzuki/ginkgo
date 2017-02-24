@@ -10,6 +10,7 @@ import queue
 from queue import Queue
 import math
 from concurrent.futures import ProcessPoolExecutor as Executor
+import gc
 
 def record_to_vec(r):
     sfen, side, turn, total, move, winner = r
@@ -56,8 +57,8 @@ def load_loop(coord, sess, enqueue_op, close_op,  path_q, pool, loop,
             data_list = list(pool.map(map_func, records))
             data_list = list(filter(lambda x: x is not None, data_list))
 
-            data_list2 = list(pool.map(flipdata, data_list))
-            data_list.extend(data_list2)
+            #data_list2 = list(pool.map(flipdata, data_list))
+            #data_list.extend(data_list2)
 
             vecs = [list(t) for t in zip(*data_list)]
             vecs = list(map(np.concatenate, vecs))
@@ -73,6 +74,9 @@ def load_loop(coord, sess, enqueue_op, close_op,  path_q, pool, loop,
 
             if loop:
                 path_q.put(path)
+
+            del data_list, vecs, records,
+            gc.collect()
 
         except queue.Empty  as e:
             try:
