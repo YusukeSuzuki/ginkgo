@@ -22,17 +22,16 @@ def weight_variable(shape, dev=0.35, name=None):
     with WithNone() if _variable_device is None else tf.device(_variable_device):
         return tf.get_variable(name, shape,
             #initializer=tf.truncated_normal_initializer(stddev=dev))
-            initializer=tf.random_uniform_initializer(minval=-0.1, maxval=0.1))
+            initializer=tf.random_uniform_initializer(minval=-dev, maxval=dev))
 
-def conv_weight_variable(shape, dev=0.35, name=None):
+def conv_weight_variable(shape, dev=1e-6, name=None):
     """create weight variable for conv2d(weight sharing)"""
-    w = 1e-2
-
     global _variable_device
 
     with WithNone() if _variable_device is None else tf.device(_variable_device):
         return tf.get_variable(name, shape,
-            initializer=tf.random_uniform_initializer(minval=0, maxval=w))
+            #initializer=tf.truncated_normal_initializer(stddev=dev))
+            initializer=tf.random_uniform_initializer(minval=dev, maxval=dev))
 
 def bias_variable(shape, val=0.1, name=None):
     """create bias variable for conv2d(weight sharing)"""
@@ -44,6 +43,16 @@ def bias_variable(shape, val=0.1, name=None):
 #           name, shape, initializer=tf.constant_initializer(val))
         return tf.get_variable(name, shape,
             initializer=tf.random_uniform_initializer(minval=-val, maxval=val))
+
+def bn_beta_gamma(target, beta_name=None, gamma_name=None):
+    """create beta,gamma variable for batch_normalization"""
+
+    global _variable_device
+
+    with WithNone() if _variable_device is None else tf.device(_variable_device):
+        return (
+            tf.get_variable(beta_name, initializer=tf.zeros_initializer(target.get_shape())), 
+            tf.get_variable(gamma_name, shape=target.get_shape(), initializer=tf.ones_initializer()) )
 
 StrDTypeMap = {
     'tf.float32': tf.float32,
@@ -111,7 +120,7 @@ class Node:
         for key, val in params.items():
             for cond in val[2]:
                 ret, mess = cond(key, self.__dict__[key])
-                assert ret, 'line {}: {}'.format(node.end_mark.line+1, mess)
+                assert ret, 'line {}: {} ({})'.format(node.end_mark.line+1, mess, self.__dict__[key])
 
         if self.nid: loader.nids[self.nid] = node.end_mark
 
@@ -270,7 +279,7 @@ class Linear(yaml.YAMLObject, Node):
 
         with tf.variable_scope(self.variable_scope) if self.variable_scope else WithNone():
             w = weight_variable(
-                [source_length,self.length], dev=1.0e-3, name="weight")
+                [source_length,self.length], dev=1.0e-5, name="weight")
             if not self.with_bias:
                 out = tf.matmul(source_node, w)
             else:
@@ -312,7 +321,7 @@ class Conv2d(yaml.YAMLObject, Node):
 
         with tf.variable_scope(self.variable_scope) if self.variable_scope else WithNone():
             w = conv_weight_variable(
-                [self.height, self.width, channels,self.kernels_num], dev=1.0e-3, name="weight")
+                [self.height, self.width, channels,self.kernels_num], dev=1.0e-5, name="weight")
 
             if not self.with_bias:
                 out = tf.nn.conv2d(
@@ -356,7 +365,7 @@ class DepthwiseConv2d(yaml.YAMLObject, Node):
 
         with tf.variable_scope(self.variable_scope) if self.variable_scope else WithNone():
             w = conv_weight_variable(
-                [self.height, self.width, channels, self.channel_multiplier], dev=1.0e-3, name="weight")
+                [self.height, self.width, channels, self.channel_multiplier], dev=1.0e-5, name="weight")
 
             if not self.with_bias:
                 out = tf.nn.depthwise_conv2d(
@@ -401,9 +410,9 @@ class SeparableConv2d(yaml.YAMLObject, Node):
 
         with tf.variable_scope(self.variable_scope) if self.variable_scope else WithNone():
             w1 = conv_weight_variable(
-                [self.height, self.width, channels, self.channel_multiplier], dev=1.0e-3, name="weight")
+                [self.height, self.width, channels, self.channel_multiplier], dev=1.0e-5, name="depthwise_weight")
             w2 = conv_weight_variable(
-                [1, 1, channels * self.channel_multiplier, self.out_channels], dev=1.0e-3, name="weight")
+                [1, 1, channels * self.channel_multiplier, self.out_channels], dev=1.0e-3, name="pointwise_weight")
 
             if not self.with_bias:
                 out = tf.nn.separable_conv2d(
@@ -718,8 +727,9 @@ class BatchNormalization(yaml.YAMLObject, Node):
 
         with tf.variable_scope(self.variable_scope) if self.variable_scope else WithNone():
             mean, var = tf.nn.moments(x, [0])
+            beta, gamma = bn_beta_gamma(x,'beta', 'gamma')
 
-        return nids, self.nid, tf.nn.batch_normalization( x, mean, var, None, None, 1e-9)
+        return nids, self.nid, tf.nn.batch_normalization( x, mean, var, beta, gamma, 1e-9)
 
 class Softmax(yaml.YAMLObject, Node):
     yaml_tag = u'!softmax'
