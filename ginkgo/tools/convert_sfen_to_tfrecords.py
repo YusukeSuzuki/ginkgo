@@ -8,7 +8,7 @@ import ginkgo.numpy_shogi as ns
 
 def create_argument_parser():
     parser = ArgumentParser()
-    parser.add_argument('-i', '--input-dir', type=str, default='./')
+    parser.add_argument('-i', '--input', type=str, default=None)
     parser.add_argument('-o', '--output-dir', type=str, default='./')
     return parser
 
@@ -24,10 +24,8 @@ def main():
     proc(args)
 
 def proc(args):
-    input_dir = Path(args.input_dir)
-
-    for f in input_dir.glob('*.sfenx'):
-        convert_file(args, f)
+    input_path = Path(args.input)
+    convert_file(args, input_path)
 
 def convert_file(args, file_path):
     records = list(map(sr.to_data, sr.load_file(file_path)))
@@ -44,6 +42,9 @@ def convert_file(args, file_path):
         # 4 .. next movement
         # 5 .. winner side
         vec = ns.sfen_to_vector(r[0], usi=r[4])
+
+        if r[1] == 'w':
+            vec = ns.player_inverse(vec)
 
         record = tf.train.Example(features=tf.train.Features(feature={
             'vec': feature_bytes(vec.tostring()),
