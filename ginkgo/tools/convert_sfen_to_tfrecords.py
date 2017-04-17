@@ -26,9 +26,8 @@ def main():
 def proc(args):
     input_dir = Path(args.input_dir)
 
-    for f in input_dir.glob('*.csa'):
+    for f in input_dir.glob('*.sfenx'):
         convert_file(args, f)
-        break
 
 def convert_file(args, file_path):
     records = list(map(sr.to_data, sr.load_file(file_path)))
