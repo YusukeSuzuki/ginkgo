@@ -1,7 +1,8 @@
 import tensorflow as tf
 import numpy as np
 
-def train_read_op(filename_queue, reader):
+def train_read_op(filename_queue):
+    reader = tf.WholeFileReader()
     _, sirialized_example = reader.read(filename_queue)
 
     features = tf.parse_single_example(serialized_example,
