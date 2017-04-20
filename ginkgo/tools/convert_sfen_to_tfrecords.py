@@ -46,6 +46,9 @@ def convert_file(args, file_path):
         if r[1] == 'w':
             vec = ns.player_inverse(vec)
 
+        #print(type(vec))
+        print(vec.dtype)
+
         record = tf.train.Example(features=tf.train.Features(feature={
             'vec': feature_bytes(vec.tostring()),
             'turn_number' : feature_int64(int(r[2])),
