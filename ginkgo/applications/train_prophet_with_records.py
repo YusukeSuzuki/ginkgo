@@ -44,10 +44,6 @@ def create_parser():
     parser.add_argument('--model-directory', type=str, default=DEFAULT_MODEL_DIRECTORY)
     parser.add_argument('--model-name', type=str, default=DEFAULT_MODEL_NAME)
 
-    #parser.add_argument('--input-model', type=str, default='')
-    #parser.add_argument('--output-model', type=str)
-
-    #parser.add_argument('--prophet-yaml', type=str)
     parser.add_argument('--model-py', type=str, default=None)
     parser.add_argument('--samples', type=str)
 
@@ -204,7 +200,7 @@ def do_train(ns):
 
                 for log in logs: writer.add_summary(log, gs)
 
-                if gs > 10 and gs % 1000 == 1:
+                if gs > 10 and gs % 10000 == 1:
                     print('save backup to: {}'.format(model_path))
                     saver.save(sess, str(model_path), global_step=gs)
 
