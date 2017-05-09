@@ -10,6 +10,7 @@ setup(name='ginkgo',
         'console_scripts':[
             'ginkgo_sfen_to_tfrecords = ginkgo.tools.convert_sfen_to_tfrecords:main',
             'ginkgo_train_prophet_with_records = ginkgo.applications.train_prophet_with_records:main',
+            'ginkgo_batch = ginkgo.tools.ginkgo_batch:main',
         ]
     },
     install_requires=[
