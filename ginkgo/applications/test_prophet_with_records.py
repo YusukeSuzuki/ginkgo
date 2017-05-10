@@ -153,6 +153,7 @@ def do_test(ns):
                     print(format_string.format(
                         rate_count, rate_avg, rate_min, rate_max,
                         (measure_end - measure_start) / display_interval, ns.minibatch_size))
+                    measure_start = time.time()
         except tf.errors.OutOfRangeError as e:
             print('sample exausted')
 
