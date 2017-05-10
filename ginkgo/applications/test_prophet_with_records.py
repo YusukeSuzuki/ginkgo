@@ -1,6 +1,7 @@
 from argparse import ArgumentParser as AP
 from pathlib import Path
 from random import shuffle
+import time
 import importlib as im
 
 import tensorflow as tf
@@ -17,7 +18,7 @@ import ginkgo.train
 
 ROOT_VARIABLE_SCOPE='prophet'
 
-MINI_BATCH_SIZE = 32
+MINIBATCH_SIZE = 32
 
 DEFAULT_READ_OP_THREADS_NUM = 4
 DEFAULT_MODEL_DIRECTORY = './model_training'
@@ -44,7 +45,7 @@ def create_parser():
     parser.add_argument('--model-py', type=str, default=None)
     parser.add_argument('--samples', type=str)
 
-    # training apllication
+    # test apllication
     parser.add_argument('--logdir', type=str, default=DEFAULT_LOG_DIRECTORY)
     #parser.add_argument('--log-gradients', type=bool, default=False)
     parser.add_argument('--log-variables', type=bool, default=False)
@@ -54,6 +55,11 @@ def create_parser():
     parser.add_argument('--num-gpus', type=int, default=1)
     parser.add_argument('--var-device', type=str, default=DEFAULT_VAR_DEVICE)
     parser.add_argument('--accum-device', type=str, default=DEFAULT_ACCUM_DEVICE)
+
+    # training parameters
+    parser.add_argument('--minibatch-size', type=int, default=MINIBATCH_SIZE)
+
+    return parser
 
 # ------------------------------------------------------------
 # sub commands
@@ -82,9 +88,6 @@ def do_test(ns):
                 ns.minibatch_size, 4000, 1000,
                 num_threads=ns.num_read_threads) for _ in range(ns.num_gpus)]
 
-            for i in input_batches:
-                print(i)
-
         if ns.model_py:
             print('load external model file: {}'.format(ns.model_py))
             model_module = im.machinery.SourceFileLoader('externalmodel', ns.model_py).load_module()
@@ -94,8 +97,10 @@ def do_test(ns):
         with tf.device('/gpu:0'):
             with tf.name_scope('tower_0') as scope:
                 inference = model_module.inference(
-                    input_batches[i][0], reuse=reuse, var_device=ns.var_device)
-                correct_rate_op = ginkgo.train.correct_rate(input_batches[i][1], inference)
+                    input_batches[0][0], reuse=False, var_device=ns.var_device)
+                correct_rate_op = ginkgo.train.correct_rate(input_batches[0][1], inference)
+
+        print(correct_rate_op)
 
         # create saver and logger
         saver = tf.train.Saver()
@@ -111,6 +116,8 @@ def do_test(ns):
         if latest_checkpoint:
             print('restore {}'.format(latest_checkpoint))
             saver.restore(sess, latest_checkpoint)
+        else:
+            raise ValueError('no model at {}'.format(str(ns.model_directory)))
 
         # run
         print('test')
@@ -123,9 +130,16 @@ def do_test(ns):
         rate_count = 0
         rate_min = 2.
         rate_max = -1
-        correct_rate_op = tags['rate']
+
+        display_interval = 100
+        format_string = \
+            'correct rate({:0.3f}): avg {:0.3f}, min {:0.3f}, max {:0.3f},' + \
+            ' time {:0.3f} (sec per minibatch({} samples))'
+
 
         try:
+            measure_start = time.time()
+
             while not coordinator.should_stop():
                 rate = sess.run( (correct_rate_op), feed_dict={} )
                 rate_count += 1
@@ -134,43 +148,29 @@ def do_test(ns):
                 rate_total += rate
                 rate_avg = rate_total / rate_count
 
-                if rate_count % 100 == 0:
-                    print('correct rate({}): avg {}, min {}, max {}'.format(
-                        rate_count, rate_avg, rate_min, rate_max))
+                if rate_count % display_interval == 0:
+                    measure_end = time.time()
+                    print(format_string.format(
+                        rate_count, rate_avg, rate_min, rate_max,
+                        (measure_end - measure_start) / display_interval, ns.minibatch_size))
         except tf.errors.OutOfRangeError as e:
             print('sample exausted')
 
-        print('correct rate: {}'.format(rate_total))
+        print('correct rate: {}'.format(rate_avg))
 
         # finalize
         coordinator.request_stop()
-        coordinator.join(load_threads)
+        coordinator.join(threads)
 
-# ------------------------------------------------------------
-# command line option parser
-# ------------------------------------------------------------
-'''
-def create_parser():
-    parser = AP(prog='train_prophet_with_records')
-    parser.set_defaults(func=None)
-    parser.add_argument('--logdir', type=str, default='./logs')
-    parser.add_argument('--growth-memory', type=bool, default=False)
-    parser.add_argument('--input-model', type=str)
-    parser.add_argument('--prophet-yaml', type=str)
-    parser.add_argument('--samples', type=str)
-    parser.add_argument('--minibatch-size', type=int, default=MINI_BATCH_SIZE)
-
-    return parser
-'''
 # ------------------------------------------------------------
 # main
 # ------------------------------------------------------------
 
-def run():
+def main():
     parser = create_parser()
     namespace = parser.parse_args()
     do_test(namespace)
 
 if __name__ == '__main__':
-    run()
+    main()
 

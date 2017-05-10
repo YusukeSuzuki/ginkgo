@@ -11,5 +11,5 @@ def correct_rate(label, inference):
         corrects = tf.equal(tf.argmax(label,1), tf.argmax(inference,1))
         rate = tf.reduce_mean(tf.cast(corrects, tf.float32))
         tf.summary.scalar('correct_rate', rate)
-        return correct_rate
+        return rate
 
