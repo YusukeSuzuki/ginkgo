@@ -12,7 +12,7 @@ DEFAULT_DEVICE='cpu'
 DEFAULT_DEVICE_NUM=1
 DEFAULT_MINIBATCH_SIZE=256
 DEFAULT_OUTPUT_NAME = 'model.pb'
-DEFAULT_VAR_DEVICE = '/cpu:0'
+DEFAULT_VAR_DEVICE = 'cpu'
 
 DEFAULT_MODEL_MODULE = 'ginkgo.models.prophet_model_20170419_0'
 
@@ -45,10 +45,9 @@ def freeze(ns):
             allow_soft_placement=True, log_device_placement=False))
 
         # build read data threads
-        with tf.name_scope('input'):
-            input_batches = [
-                tf.placeholder(dtype=tf.float32, shape=[ns.minibatch_size, 9,9,360])
-                for _ in range(ns.num_devices)]
+        input_batches = [
+            tf.placeholder(dtype=tf.float32, shape=[ns.minibatch_size, 9,9,360],
+                name='input_{}'.format(i)) for i in range(ns.num_devices)]
 
         if ns.model_py:
             print('load external model file: {}'.format(ns.model_py))
@@ -56,13 +55,22 @@ def freeze(ns):
         else:
             model_module = im.import_module(DEFAULT_MODEL_MODULE)
 
-        with tf.device('/{}:0'.format(ns.device)):
-            with tf.name_scope('tower_0') as scope:
-                inference = model_module.inference(
-                    input_batches[0], reuse=False, var_device=ns.var_device)
+        reuse = False
 
-        inference = tf.identity(inference, name='inference')
-        # create saver and logger
+        inferences = []
+
+        for i in range(ns.num_devices):
+            with tf.device('/{}:{}'.format(ns.device,i)):
+                with tf.name_scope('tower_{}'.format(i)) as scope:
+                    device_num = 0 if ns.var_device == 'cpu' else i
+                    inference = model_module.inference(
+                        input_batches[i], reuse=reuse, var_device='/{}:{}'.format(ns.var_device, device_num))
+                    inferences.append(inference)
+                    reuse = True
+
+        inference = tf.concat(axis=0, values=inferences, name='inference')
+
+        # create saver
         saver = tf.train.Saver()
 
         # ready to run
