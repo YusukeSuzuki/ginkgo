@@ -1,6 +1,7 @@
 from itertools import product
 import shogi as sh
 import numpy as np
+from math import ceil
 
 # 'a-Z' is position dimention
 # '_' is movement dimention
@@ -300,7 +301,7 @@ def extract_movement_vec(vec, color=0):
 # ------------------------------------------------------------
 
 def zero_vec():
-    return np.zeros([9,9,360])
+    return np.zeros([1,9,9,360])
 
 # ------------------------------------------------------------
 # board to legal move tensor
@@ -312,12 +313,11 @@ def create_next_move_tensors(board, minibatch_size, muliplyer):
 
     for move in board.legal_moves:
         vec = sfen_to_vector(board.sfen(), usi=move.usi())
-        vec = np.expand_dims(vec, axis=0)
         samples.append(vec)
 
     blob = minibatch_size * muliplyer
 
-    for i in range(blob - len(samples) % blob):
+    for i in range( ceil(len(samples) / blob) * blob - len(samples) ):
         samples.append(zero_vec())
 
     return samples

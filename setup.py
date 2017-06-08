@@ -11,6 +11,7 @@ setup(name='ginkgo',
             'ginkgo_sfen_to_tfrecords = ginkgo.tools.convert_sfen_to_tfrecords:main',
             'ginkgo_train_prophet_with_records = ginkgo.applications.train_prophet_with_records:main',
             'ginkgo_test_prophet_with_records = ginkgo.applications.test_prophet_with_records:main',
+            'ginkgo_self_match = ginkgo.applications.self_match:main',
             'ginkgo_batch = ginkgo.tools.ginkgo_batch:main',
             'ginkgo_freeze_model = ginkgo.tools.freeze_model:main',
         ]
